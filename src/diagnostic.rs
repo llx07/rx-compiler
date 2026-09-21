@@ -15,21 +15,34 @@ impl Diagnostic {
     }
 
     pub fn show(&self, filename: &str, source: &str) {
+        const RED: &str = "\x1b[31m";
+        const BLUE: &str = "\x1b[34m";
+        const BOLD: &str = "\x1b[1m";
+        const RESET: &str = "\x1b[0m";
+
         let source_line = source.lines().nth(self.line - 1).unwrap_or("");
 
-        eprintln!("error: {}", self.message);
+        eprintln!("{BOLD}{RED}error{RESET}: {}", self.message);
         let width = self.line.to_string().len();
 
         eprintln!(
-            "{:>width$}--> {}:{}:{}",
-            "", filename, self.line, self.column
-        );
-        eprintln!("{:>width$} |", "", width = width);
-        eprintln!("{:>width$} | {}", self.line, source_line, width = width);
-        eprintln!(
-            "{:>width$} | {}^",
+            "{:>width$}{BLUE}--> {RESET}{}:{}:{}",
             "",
-            " ".repeat(self.column.saturating_sub(1)),
+            filename,
+            self.line,
+            self.column + 1
+        );
+        eprintln!("{BLUE}{:>width$} |{RESET}", "", width = width);
+        eprintln!(
+            "{BLUE}{:>width$} |{RESET} {}",
+            self.line,
+            source_line,
+            width = width
+        );
+        eprintln!(
+            "{BLUE}{:>width$} |{RESET} {}{RED}^{RESET}",
+            "",
+            " ".repeat(self.column),
             width = width
         );
     }
