@@ -6,4 +6,4 @@
 	url = https://github.com/ACMClassCourse-2025/rx-compiler-testcases
 [submodule "vendor/REIMU"]
 	path = vendor/REIMU
-	url = https://github.com/wanoful/REIMU.git
+	url = https://github.com/llx07/REIMU.git
