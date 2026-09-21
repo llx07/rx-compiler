@@ -1,0 +1,26 @@
+{
+  "version": 2,
+  "policy": "assume-true",
+  "note": "unknown coordinates currently default to assume-true; a future minor release changes the default to error",
+  "options": [
+    {
+      "name": "tokenVocab",
+      "value": "RxLexer",
+      "line": 5,
+      "column": 10,
+      "disposition": "metadata"
+    }
+  ],
+  "grammars": [
+    {
+      "kind": "lexer",
+      "name": "RxLexer",
+      "coordinates": []
+    },
+    {
+      "kind": "parser",
+      "name": "RxParser",
+      "coordinates": []
+    }
+  ]
+}

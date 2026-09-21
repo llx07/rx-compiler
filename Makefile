@@ -11,6 +11,7 @@ RUN_TIMEOUT ?= 10
 
 # Export commands as data, so shell quoting survives Make's recipe expansion.
 export RX_TEST_BUILD = $(BUILD)
+export RX_TEST_LEX = $(LEX)
 export RX_TEST_SEMANTIC = $(SEMANTIC)
 export RX_TEST_CODEGEN = $(CODEGEN)
 export RX_TEST_RUN = $(RUN)

@@ -1,5 +1,5 @@
 // Rx course lexer. ANTLR 4.13.2; no target-specific actions or predicates.
-lexer grammar Lexer;
+lexer grammar RxLexer;
 
 AS: 'as';
 BREAK: 'break';

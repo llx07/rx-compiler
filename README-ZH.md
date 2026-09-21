@@ -50,6 +50,7 @@ Makefile 是调用你编译器的统一入口。你需要编辑 [`config.mk`](co
 | 命令名称 | 用途 |
 | --- | --- |
 | `BUILD` | 构建编译器的命令，可为空。执行必须以退出码 0 结束。 |
+| `LEX` | 检查词法分析。接受时退出码为 0，拒绝时为 1。 |
 | `SEMANTIC` | 对完整程序进行语义分析检查。接受（通过）时退出码为 0，拒绝（未通过）时退出码为 1。 |
 | `CODEGEN` | 编译代码生成（codegen）与优化（optimization）测试用例，并将生成的 RV32IM 汇编输出到 `{output}`，供默认的 `RUN` 命令调用。 |
 | `RUN` | 运行 `{output}`。可选占位符 `{stdout}` 和 `{profile}` 分别用于指定单次执行的输出重定向文件和性能剖析文件。 |
@@ -69,7 +70,7 @@ REIMU 从汇编代码中的全局 `main` 符号处开始执行，并提供其支
 
 测试用例位于 `tests/` 目录下，并按子目录组织。建议遵循 "命名空间:测试集:测试用例"（namespace:test-suite:testcase）的命名规范。例如，`official:semantic:arrays` 表示 `official` 命名空间下 `semantic` 测试集中的 `arrays` 测试用例。
 
-每个测试用例可以包含一个或多个源文件、可选的输入和输出文件，以及一个必需的 `manifest.json` 清单文件（用于定义该测试用例的格式）。详情请参阅[官方 Schema](tests/official/manifest.schema.json)。清单中的 `stage` 参数决定了该测试用例的运行方式：`semantic` 调用 `SEMANTIC`，而 `codegen` 和 `optimization` 则先调用 `CODEGEN`，随后调用 `RUN`。
+每个测试用例可以包含一个或多个源文件、可选的输入和输出文件，以及一个必需的 `manifest.json` 清单文件（用于定义该测试用例的格式）。详情请参阅[官方 Schema](tests/official/manifest.schema.json)。清单中的 `stage` 参数决定了该测试用例的运行方式：`lex` 调用 `LEX`，`semantic` 调用 `SEMANTIC`，而 `codegen` 和 `optimization` 则先调用 `CODEGEN`，随后调用 `RUN`。
 
 鼓励在 `tests/custom` 目录下添加你自己的测试用例，测试运行器会自动发现并加载它们。
 
@@ -77,11 +78,11 @@ REIMU 从汇编代码中的全局 `main` 符号处开始执行，并提供其支
 
 | 测试用例类型 | 判定要求 |
 | --- | --- |
-| Semantic | 编译器退出码必须为 0 或 1，且与 `compilation_success` 相符。其他退出码、异常信号或超时均视为用例失败。 |
+| Lex / Semantic | 编译器退出码必须为 0 或 1，且与 `compilation_success` 相符。其他退出码、异常信号或超时均视为用例失败。 |
 | Codegen | 编译必须以退出码 0 结束并生成 `{output}`。每组 `io` 对都会执行该构建产物，且输出必须与预期文件完全匹配。 |
 | Optimization | 判定要求同代码生成；当 `RUN` 提供 `{profile}` 占位符时，会额外报告周期数。 |
 
-类型为 `lex` 和 `parse` 的测试用例将被跳过，因为我们已经提供了 G4 文法。如果你希望自行实现这些阶段，可以扩展 Makefile。
+Lexer 测试只检查接受或拒绝，不比较 `metadata.tokens`。类型为 `parse` 的测试仍被跳过。当前 `LEX` 使用 `--stage frontend`，该阶段目前只做词法检查；将来 frontend 加入语法分析时，需要为 `LEX` 配置独立的词法阶段。
 
 ## 运行测试
 
@@ -89,12 +90,15 @@ REIMU 从汇编代码中的全局 `main` 符号处开始执行，并提供其支
 
 ```sh
 make test
+make test FILTER=official:lexer BUILD='cargo build --locked' VERBOSE=true
 make test FILTER=official:semantic
 make test FILTER=official:codegen:arrays,official:optimization
 make test FILTER=custom
 make test FILTER=official:optimization COMPILE_TIMEOUT=60 RUN_TIMEOUT=30
 make test VERBOSE=true
 ```
+
+上面的 lexer 专用命令通过覆盖 `BUILD` 构建本地 Rust binary。默认 `BUILD` 仍构建参考运行库；运行全部测试集前，需要另外构建本地 binary。
 
 支持的环境变量包括：
 

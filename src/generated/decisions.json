@@ -1,0 +1,1818 @@
+{
+  "version": 2,
+  "fixedLookahead": null,
+  "grammars": [
+    {
+      "name": "RxParser",
+      "summary": {
+        "total": 221,
+        "ll1": 94,
+        "fixed": 0,
+        "adaptive": 127
+      },
+      "decisions": [
+        {
+          "decision": 0,
+          "rule": "crate",
+          "state": 297,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 1,
+          "rule": "item",
+          "state": 307,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 2,
+          "rule": "useTree",
+          "state": 314,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 3,
+          "rule": "useTree",
+          "state": 317,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 4,
+          "rule": "useTree",
+          "state": 326,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 5,
+          "rule": "useTree",
+          "state": 330,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 6,
+          "rule": "useTree",
+          "state": 332,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 7,
+          "rule": "useTree",
+          "state": 335,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 8,
+          "rule": "useTree",
+          "state": 341,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 9,
+          "rule": "useTree",
+          "state": 343,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 10,
+          "rule": "useTree",
+          "state": 345,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 11,
+          "rule": "usePath",
+          "state": 348,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 12,
+          "rule": "usePath",
+          "state": 355,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 13,
+          "rule": "usePathSegment",
+          "state": 362,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 14,
+          "rule": "functionDefinition",
+          "state": 367,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 15,
+          "rule": "functionDefinition",
+          "state": 371,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 16,
+          "rule": "functionDefinition",
+          "state": 376,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 17,
+          "rule": "functionDefinition",
+          "state": 379,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 18,
+          "rule": "functionParameters",
+          "state": 388,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 19,
+          "rule": "functionParameters",
+          "state": 392,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 20,
+          "rule": "functionParameters",
+          "state": 399,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 21,
+          "rule": "functionParameters",
+          "state": 403,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 22,
+          "rule": "functionParameters",
+          "state": 405,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 23,
+          "rule": "selfParam",
+          "state": 409,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 24,
+          "rule": "selfParam",
+          "state": 411,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 25,
+          "rule": "selfParam",
+          "state": 414,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 26,
+          "rule": "structDefinition",
+          "state": 425,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 27,
+          "rule": "structDefinition",
+          "state": 431,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 28,
+          "rule": "structDefinition",
+          "state": 434,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 29,
+          "rule": "structDefinition",
+          "state": 442,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 30,
+          "rule": "structDefinition",
+          "state": 446,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 31,
+          "rule": "structDefinition",
+          "state": 448,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 32,
+          "rule": "outerAttribute",
+          "state": 465,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 33,
+          "rule": "outerAttribute",
+          "state": 469,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 34,
+          "rule": "outerAttribute",
+          "state": 471,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 35,
+          "rule": "inherentImpl",
+          "state": 488,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 36,
+          "rule": "inherentImpl",
+          "state": 492,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 37,
+          "rule": "inherentImpl",
+          "state": 498,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 38,
+          "rule": "associatedItem",
+          "state": 505,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 39,
+          "rule": "genericParams",
+          "state": 513,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 40,
+          "rule": "genericParams",
+          "state": 517,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 41,
+          "rule": "genericParams",
+          "state": 519,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 42,
+          "rule": "lifetimeParam",
+          "state": 526,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 43,
+          "rule": "lifetimeBounds",
+          "state": 535,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 44,
+          "rule": "lifetimeBounds",
+          "state": 539,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 45,
+          "rule": "typeParamBounds",
+          "state": 546,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 46,
+          "rule": "typeParamBounds",
+          "state": 550,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 47,
+          "rule": "whereClause",
+          "state": 558,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 48,
+          "rule": "whereClause",
+          "state": 562,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 49,
+          "rule": "whereClause",
+          "state": 564,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 50,
+          "rule": "whereClauseItem",
+          "state": 573,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 51,
+          "rule": "whereClauseItem",
+          "state": 575,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 52,
+          "rule": "typeRef",
+          "state": 586,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 53,
+          "rule": "referenceType",
+          "state": 590,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 54,
+          "rule": "referenceType",
+          "state": 593,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 55,
+          "rule": "typePath",
+          "state": 608,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 56,
+          "rule": "typePathSegment",
+          "state": 613,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 57,
+          "rule": "typePathSegment",
+          "state": 616,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 58,
+          "rule": "pathInExpression",
+          "state": 623,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 59,
+          "rule": "pathExprSegment",
+          "state": 629,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 60,
+          "rule": "pathIdentSegment",
+          "state": 634,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 61,
+          "rule": "genericArgs",
+          "state": 642,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 62,
+          "rule": "genericArgs",
+          "state": 646,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 63,
+          "rule": "genericArgs",
+          "state": 648,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 64,
+          "rule": "genericArg",
+          "state": 654,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 65,
+          "rule": "closedCastType",
+          "state": 660,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 66,
+          "rule": "closedCastType",
+          "state": 666,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 67,
+          "rule": "closedCastType",
+          "state": 669,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 68,
+          "rule": "closedCastType",
+          "state": 677,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 69,
+          "rule": "closedCastType",
+          "state": 682,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 70,
+          "rule": "closedCastType",
+          "state": 686,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 71,
+          "rule": "constValue",
+          "state": 698,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 72,
+          "rule": "magnitude",
+          "state": 706,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 73,
+          "rule": "identifierBinding",
+          "state": 709,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 74,
+          "rule": "letStatement",
+          "state": 717,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 75,
+          "rule": "blockExpression",
+          "state": 727,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 76,
+          "rule": "blockExpression",
+          "state": 731,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 77,
+          "rule": "statement",
+          "state": 739,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 78,
+          "rule": "statement",
+          "state": 744,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 79,
+          "rule": "expressionWithBlock",
+          "state": 754,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 80,
+          "rule": "ifExpression",
+          "state": 762,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 81,
+          "rule": "ifExpression",
+          "state": 764,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 82,
+          "rule": "assignmentExpression",
+          "state": 772,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 83,
+          "rule": "logicalOrExpression",
+          "state": 779,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 84,
+          "rule": "logicalAndExpression",
+          "state": 787,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 85,
+          "rule": "comparisonExpression",
+          "state": 794,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 86,
+          "rule": "comparisonExpression",
+          "state": 800,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 87,
+          "rule": "bitOrExpression",
+          "state": 807,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 88,
+          "rule": "closedBitOrExpression",
+          "state": 815,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 89,
+          "rule": "bitXorExpression",
+          "state": 825,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 90,
+          "rule": "closedBitXorExpression",
+          "state": 833,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 91,
+          "rule": "bitAndExpression",
+          "state": 843,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 92,
+          "rule": "closedBitAndExpression",
+          "state": 851,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 93,
+          "rule": "shiftExpression",
+          "state": 862,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 94,
+          "rule": "shiftExpression",
+          "state": 864,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 95,
+          "rule": "closedShiftExpression",
+          "state": 875,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 96,
+          "rule": "closedShiftExpression",
+          "state": 877,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 97,
+          "rule": "additiveExpression",
+          "state": 888,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 98,
+          "rule": "closedAdditiveExpression",
+          "state": 896,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 99,
+          "rule": "multiplicativeExpression",
+          "state": 907,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 100,
+          "rule": "closedMultiplicativeExpression",
+          "state": 915,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 101,
+          "rule": "castExpression",
+          "state": 925,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 102,
+          "rule": "closedCastExpression",
+          "state": 933,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 103,
+          "rule": "unaryExpression",
+          "state": 939,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 104,
+          "rule": "postfixExpression",
+          "state": 945,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 105,
+          "rule": "conditionAssignmentExpression",
+          "state": 954,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 106,
+          "rule": "conditionLogicalOrExpression",
+          "state": 961,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 107,
+          "rule": "conditionLogicalAndExpression",
+          "state": 969,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 108,
+          "rule": "conditionComparisonExpression",
+          "state": 976,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 109,
+          "rule": "conditionComparisonExpression",
+          "state": 982,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 110,
+          "rule": "conditionBitOrExpression",
+          "state": 989,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 111,
+          "rule": "conditionClosedBitOrExpression",
+          "state": 997,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 112,
+          "rule": "conditionBitXorExpression",
+          "state": 1007,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 113,
+          "rule": "conditionClosedBitXorExpression",
+          "state": 1015,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 114,
+          "rule": "conditionBitAndExpression",
+          "state": 1025,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 115,
+          "rule": "conditionClosedBitAndExpression",
+          "state": 1033,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 116,
+          "rule": "conditionShiftExpression",
+          "state": 1044,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 117,
+          "rule": "conditionShiftExpression",
+          "state": 1046,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 118,
+          "rule": "conditionClosedShiftExpression",
+          "state": 1057,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 119,
+          "rule": "conditionClosedShiftExpression",
+          "state": 1059,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 120,
+          "rule": "conditionAdditiveExpression",
+          "state": 1070,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 121,
+          "rule": "conditionClosedAdditiveExpression",
+          "state": 1078,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 122,
+          "rule": "conditionMultiplicativeExpression",
+          "state": 1089,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 123,
+          "rule": "conditionClosedMultiplicativeExpression",
+          "state": 1097,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 124,
+          "rule": "conditionCastExpression",
+          "state": 1107,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 125,
+          "rule": "conditionClosedCastExpression",
+          "state": 1115,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 126,
+          "rule": "conditionUnaryExpression",
+          "state": 1121,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 127,
+          "rule": "conditionPostfixExpression",
+          "state": 1127,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 128,
+          "rule": "conditionBreakAssignmentExpression",
+          "state": 1136,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 129,
+          "rule": "conditionBreakLogicalOrExpression",
+          "state": 1143,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 130,
+          "rule": "conditionBreakLogicalAndExpression",
+          "state": 1151,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 131,
+          "rule": "conditionBreakComparisonExpression",
+          "state": 1158,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 132,
+          "rule": "conditionBreakComparisonExpression",
+          "state": 1164,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 133,
+          "rule": "conditionBreakBitOrExpression",
+          "state": 1171,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 134,
+          "rule": "conditionBreakClosedBitOrExpression",
+          "state": 1182,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 135,
+          "rule": "conditionBreakClosedBitOrExpression",
+          "state": 1187,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 136,
+          "rule": "conditionBreakBitXorExpression",
+          "state": 1194,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 137,
+          "rule": "conditionBreakClosedBitXorExpression",
+          "state": 1205,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 138,
+          "rule": "conditionBreakClosedBitXorExpression",
+          "state": 1210,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 139,
+          "rule": "conditionBreakBitAndExpression",
+          "state": 1217,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 140,
+          "rule": "conditionBreakClosedBitAndExpression",
+          "state": 1228,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 141,
+          "rule": "conditionBreakClosedBitAndExpression",
+          "state": 1233,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 142,
+          "rule": "conditionBreakShiftExpression",
+          "state": 1242,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 143,
+          "rule": "conditionBreakShiftExpression",
+          "state": 1250,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 144,
+          "rule": "conditionBreakShiftExpression",
+          "state": 1252,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 145,
+          "rule": "conditionBreakShiftExpression",
+          "state": 1257,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 146,
+          "rule": "conditionBreakClosedShiftExpression",
+          "state": 1266,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 147,
+          "rule": "conditionBreakClosedShiftExpression",
+          "state": 1274,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 148,
+          "rule": "conditionBreakClosedShiftExpression",
+          "state": 1276,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 149,
+          "rule": "conditionBreakClosedShiftExpression",
+          "state": 1281,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 150,
+          "rule": "conditionBreakAdditiveExpression",
+          "state": 1289,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 151,
+          "rule": "conditionBreakClosedAdditiveExpression",
+          "state": 1300,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 152,
+          "rule": "conditionBreakClosedAdditiveExpression",
+          "state": 1305,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 153,
+          "rule": "conditionBreakMultiplicativeExpression",
+          "state": 1313,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 154,
+          "rule": "conditionBreakClosedMultiplicativeExpression",
+          "state": 1324,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 155,
+          "rule": "conditionBreakClosedMultiplicativeExpression",
+          "state": 1329,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 156,
+          "rule": "conditionBreakCastExpression",
+          "state": 1336,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 157,
+          "rule": "conditionBreakClosedCastExpression",
+          "state": 1344,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 158,
+          "rule": "conditionBreakUnaryExpression",
+          "state": 1350,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 159,
+          "rule": "conditionBreakPostfixExpression",
+          "state": 1356,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 160,
+          "rule": "statementAssignmentExpression",
+          "state": 1365,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 161,
+          "rule": "statementLogicalOrExpression",
+          "state": 1372,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 162,
+          "rule": "statementLogicalAndExpression",
+          "state": 1380,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 163,
+          "rule": "statementComparisonExpression",
+          "state": 1387,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 164,
+          "rule": "statementComparisonExpression",
+          "state": 1393,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 165,
+          "rule": "statementBitOrExpression",
+          "state": 1400,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 166,
+          "rule": "statementClosedBitOrExpression",
+          "state": 1411,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 167,
+          "rule": "statementClosedBitOrExpression",
+          "state": 1416,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 168,
+          "rule": "statementBitXorExpression",
+          "state": 1423,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 169,
+          "rule": "statementClosedBitXorExpression",
+          "state": 1434,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 170,
+          "rule": "statementClosedBitXorExpression",
+          "state": 1439,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 171,
+          "rule": "statementBitAndExpression",
+          "state": 1446,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 172,
+          "rule": "statementClosedBitAndExpression",
+          "state": 1457,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 173,
+          "rule": "statementClosedBitAndExpression",
+          "state": 1462,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 174,
+          "rule": "statementShiftExpression",
+          "state": 1471,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 175,
+          "rule": "statementShiftExpression",
+          "state": 1479,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 176,
+          "rule": "statementShiftExpression",
+          "state": 1481,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 177,
+          "rule": "statementShiftExpression",
+          "state": 1486,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 178,
+          "rule": "statementClosedShiftExpression",
+          "state": 1495,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 179,
+          "rule": "statementClosedShiftExpression",
+          "state": 1503,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 180,
+          "rule": "statementClosedShiftExpression",
+          "state": 1505,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 181,
+          "rule": "statementClosedShiftExpression",
+          "state": 1510,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 182,
+          "rule": "statementAdditiveExpression",
+          "state": 1518,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 183,
+          "rule": "statementClosedAdditiveExpression",
+          "state": 1529,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 184,
+          "rule": "statementClosedAdditiveExpression",
+          "state": 1534,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 185,
+          "rule": "statementMultiplicativeExpression",
+          "state": 1542,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 186,
+          "rule": "statementClosedMultiplicativeExpression",
+          "state": 1553,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 187,
+          "rule": "statementClosedMultiplicativeExpression",
+          "state": 1558,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 188,
+          "rule": "statementCastExpression",
+          "state": 1565,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 189,
+          "rule": "statementClosedCastExpression",
+          "state": 1573,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 190,
+          "rule": "statementUnaryExpression",
+          "state": 1579,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 191,
+          "rule": "statementPostfixExpression",
+          "state": 1585,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 192,
+          "rule": "statementPostfixExpression",
+          "state": 1593,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 193,
+          "rule": "statementPostfixExpression",
+          "state": 1596,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 194,
+          "rule": "primaryExpression",
+          "state": 1600,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 195,
+          "rule": "nonBlockPrimary",
+          "state": 1606,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 196,
+          "rule": "nonBlockPrimary",
+          "state": 1609,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 197,
+          "rule": "nonBlockPrimary",
+          "state": 1613,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 198,
+          "rule": "nonBlockPrimary",
+          "state": 1619,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 199,
+          "rule": "nonBlockPrimary",
+          "state": 1623,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 200,
+          "rule": "nonBlockPrimary",
+          "state": 1626,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 201,
+          "rule": "conditionPrimary",
+          "state": 1630,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 202,
+          "rule": "conditionPrimaryWithoutBareBlock",
+          "state": 1636,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 203,
+          "rule": "conditionPrimaryWithoutBareBlock",
+          "state": 1649,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 204,
+          "rule": "conditionPrimaryWithoutBareBlock",
+          "state": 1653,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 205,
+          "rule": "conditionPrimaryWithoutBareBlock",
+          "state": 1656,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 206,
+          "rule": "structExprFields",
+          "state": 1665,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 207,
+          "rule": "structExprFields",
+          "state": 1669,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 208,
+          "rule": "arrayExpression",
+          "state": 1683,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 209,
+          "rule": "arrayExpression",
+          "state": 1687,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 210,
+          "rule": "arrayExpression",
+          "state": 1689,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 211,
+          "rule": "arrayExpression",
+          "state": 1691,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 212,
+          "rule": "postfixSuffix",
+          "state": 1701,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 213,
+          "rule": "dotSuffix",
+          "state": 1709,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 214,
+          "rule": "callArguments",
+          "state": 1717,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 215,
+          "rule": "callArguments",
+          "state": 1721,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 216,
+          "rule": "callArguments",
+          "state": 1723,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 217,
+          "rule": "unaryOperator",
+          "state": 1732,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 218,
+          "rule": "unaryOperator",
+          "state": 1734,
+          "canDefer": false,
+          "tier": "ll1"
+        },
+        {
+          "decision": 219,
+          "rule": "comparisonExceptLt",
+          "state": 1751,
+          "canDefer": true,
+          "tier": "adaptive",
+          "reason": "not-disjoint",
+          "probedLookahead": 1
+        },
+        {
+          "decision": 220,
+          "rule": "assignmentOperator",
+          "state": 1766,
+          "canDefer": false,
+          "tier": "ll1"
+        }
+      ]
+    }
+  ]
+}

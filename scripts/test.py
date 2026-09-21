@@ -19,7 +19,7 @@ import time
 
 
 RUNTIME_STAGES = ("codegen", "optimization")
-STAGES = ("semantic", *RUNTIME_STAGES)
+STAGES = ("lex", "semantic", *RUNTIME_STAGES)
 
 
 class TestError(Exception):
@@ -187,7 +187,7 @@ def discover(root):
                 raise TestError("manifest must be a nonempty array")
             for index, entry in enumerate(entries, 1):
                 # Stage, rather than folder name or depth, determines support.
-                if isinstance(entry, dict) and entry.get("stage") in ("lex", "parse"):
+                if isinstance(entry, dict) and entry.get("stage") == "parse":
                     continue
                 if not isinstance(entry, dict) or entry.keys() - allowed:
                     raise TestError(f"entry {index}: invalid testcase fields")
@@ -218,7 +218,7 @@ def discover(root):
         except (TestError, ValueError, OSError) as error:
             raise TestError(f"{manifest}: {error}") from error
     if not cases:
-        raise TestError(f"no semantic, codegen, or optimization testcases found under {root}")
+        raise TestError(f"no lex, semantic, codegen, or optimization testcases found under {root}")
     return cases
 
 
@@ -352,7 +352,7 @@ def main():
         selected_filter = os.environ.get("FILTER", "")
         cases = select(discover(args.tests_dir.resolve()), selected_filter)
         commands = {name: os.environ.get(f"RX_TEST_{name.upper()}", "")
-                    for name in ("semantic", "codegen", "run")}
+                    for name in ("lex", "semantic", "codegen", "run")}
         for stage in {c.compiler_command for c in cases} | ({"run"} if any(c.stage in RUNTIME_STAGES for c in cases) else set()):
             if not commands[stage].strip():
                 raise TestError(f"set {stage.upper()} in config.mk before running these tests")

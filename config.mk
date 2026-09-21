@@ -1,10 +1,11 @@
-# Fill in these four commands. See README.md for how to fill in this.
+# Fill in these commands. See README.md for how to fill in this.
 
 # Optional: build your compiler once before testing. Leave empty if prebuilt.
-BUILD = CARGO_PROFILE_RELEASE_LTO=true cargo build --quiet --locked --release \
-    --manifest-path crates/rx/Cargo.toml \
-    --target-dir target/reference \
-    --target riscv32im-unknown-none-elf
+BUILD = cargo build --locked
+
+# Required for lexer tests: exit 0 to accept {source}, 1 to reject it.
+# Override BUILD with 'cargo build --locked' when running only lexer tests.
+LEX = ./target/debug/rx-compiler --stage frontend {source}
 
 # Required for semantic tests: exit 0 to accept {source}, 1 to reject it.
 SEMANTIC = RX_SOURCE={source} $(REFERENCE_RUSTC) --cfg rx_semantic \

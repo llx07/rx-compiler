@@ -1,8 +1,8 @@
 // Rx course language. Entry point: crate. ANTLR 4.13.2; any target language.
 // Read README.md for token conventions, precedence, and block tails.
-parser grammar Parser;
+parser grammar RxParser;
 
-options { tokenVocab=Lexer; }
+options { tokenVocab=RxLexer; }
 
 crate
     : item* EOF

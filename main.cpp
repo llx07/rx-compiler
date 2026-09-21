@@ -2,8 +2,9 @@ mod diagnostic;
 mod frontend;
 mod generated;
 
-use std::path::PathBuf;
 use std::{error::Error, fs};
+use std::fs::File;
+use std::path::PathBuf;
 
 use clap::{Parser, ValueEnum};
 
@@ -18,30 +19,26 @@ struct Args {
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]
 
 enum CompileStage {
-    Frontend,
+    Lexer,
+    Parser,
     Semantic,
     CodeGen,
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args = Args::parse();
-    // println!("{:?} {:?}", args.file.to_str(), args.stage);
+    println!("{:?} {:?}", args.file.to_str(), args.stage);
 
-    let source = fs::read_to_string(&args.file)?;
-
-    let ast = match frontend::parse(&source) {
+    let source = fs::read_to_string(args.file)?;
+    
+    let ast = match frontend::parse(source){
         Ok(ast) => ast,
         Err(diag) => {
-            diag.show(args.file.to_str().unwrap(), &source);
+            diag.show();
             std::process::exit(1);
         }
     };
-
-    if args.stage == CompileStage::Frontend {
-        // TODO: print AST here.
-        return Ok(());
-    }
-
+    
     Ok(())
     // return compile();
 }
