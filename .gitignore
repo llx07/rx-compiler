@@ -13,3 +13,10 @@ __pycache__/
 # Local files
 dev/
 *.local.*
+
+
+# Added by cargo
+#
+# already existing elements were commented out
+
+#/target
