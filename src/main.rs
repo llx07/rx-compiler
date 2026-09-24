@@ -33,9 +33,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let source = fs::read_to_string(&args.file)?;
 
-    let tokens: antlr4_runtime::CommonTokenStream<
-        generated::rx_lexer::RxLexer<antlr4_runtime::InputStream>,
-    > = match frontend::lexer_parse(&source) {
+    let tokens= match frontend::lexer_parse(&source) {
         Ok(tokens) => tokens,
         Err(diag) => {
             diag.show(args.file.to_str().unwrap(), &source);
@@ -56,6 +54,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
         return Ok(());
     }
+
+    let ast = match frontend::parser_parse(tokens) {
+        Ok(ast) => ast,
+        Err(diag) => {
+            diag.show(args.file.to_str().unwrap(), &source);
+            std::process::exit(1);
+        }
+    };
 
     Ok(())
     // return compile();
