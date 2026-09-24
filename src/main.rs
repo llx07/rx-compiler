@@ -5,7 +5,10 @@ mod generated;
 use std::path::PathBuf;
 use std::{error::Error, fs};
 
+use antlr4_runtime::Token as _;
 use clap::{Parser, ValueEnum};
+
+use crate::generated::rx_lexer;
 
 #[derive(Parser)]
 
@@ -18,7 +21,8 @@ struct Args {
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]
 
 enum CompileStage {
-    Frontend,
+    Lexer,
+    Parser,
     Semantic,
     CodeGen,
 }
@@ -29,16 +33,27 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let source = fs::read_to_string(&args.file)?;
 
-    let ast = match frontend::parse(&source) {
-        Ok(ast) => ast,
+    let tokens: antlr4_runtime::CommonTokenStream<
+        generated::rx_lexer::RxLexer<antlr4_runtime::InputStream>,
+    > = match frontend::lexer_parse(&source) {
+        Ok(tokens) => tokens,
         Err(diag) => {
             diag.show(args.file.to_str().unwrap(), &source);
             std::process::exit(1);
         }
     };
 
-    if args.stage == CompileStage::Frontend {
-        // TODO: print AST here.
+    if args.stage == CompileStage::Lexer {
+        let vocabulary = rx_lexer::metadata().vocabulary();
+
+        for token in tokens.tokens() {
+            println!(
+                "type={} channel={} text={:?}",
+                vocabulary.display_name(token.token_type()),
+                token.channel(),
+                token.text(),
+            );
+        }
         return Ok(());
     }
 

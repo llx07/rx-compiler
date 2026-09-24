@@ -5,7 +5,7 @@ BUILD = cargo build --locked
 
 # Required for lexer tests: exit 0 to accept {source}, 1 to reject it.
 # Override BUILD with 'cargo build --locked' when running only lexer tests.
-LEX = ./target/debug/rx-compiler --stage frontend {source}
+LEX = ./target/debug/rx-compiler --stage lexer {source}
 
 # Required for semantic tests: exit 0 to accept {source}, 1 to reject it.
 SEMANTIC = RX_SOURCE={source} $(REFERENCE_RUSTC) --cfg rx_semantic \

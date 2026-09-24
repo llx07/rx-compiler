@@ -2,23 +2,12 @@ use antlr4_runtime::{CommonTokenStream, InputStream, Token};
 
 use crate::diagnostic::{CompileResult, Diagnostic};
 use crate::generated::rx_lexer::{self, RxLexer};
-use crate::generated::rx_parser::RxParser;
+use crate::generated::rx_parser::{self, RxParser};
 
-// TODO: we have not implemented AST for now
-// frontend does not return any value and only check
-// for grammars.
-pub fn parse(source: &str) -> CompileResult<()> {
+pub fn lexer_parse(source: &str) -> CompileResult<CommonTokenStream<RxLexer<InputStream>>> {
     let lexer = RxLexer::new(InputStream::new(source));
     let tokens: CommonTokenStream<RxLexer<InputStream>> = CommonTokenStream::new(lexer);
-    // let vocabulary = rx_lexer::metadata().vocabulary();
     for token in tokens.tokens() {
-        // println!(
-        //     "type={} channel={} text={:?}",
-        //     vocabulary.display_name(token.token_type()),
-        //     token.channel(),
-        //     token.text(),
-        // );
-
         match token.token_type() {
             rx_lexer::INVALID_CHARACTER_LITERAL => {
                 return Err(Diagnostic::new(
@@ -62,5 +51,5 @@ pub fn parse(source: &str) -> CompileResult<()> {
         }
     }
 
-    return Ok(());
+    return Ok(tokens);
 }
