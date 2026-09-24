@@ -52,7 +52,6 @@ The Makefile is our unified entrypoint in accessing your compiler. You are expec
 | Command Name | Purpose |
 | --- | --- |
 | `BUILD` | The command to build your compiler, can be empty. Must exit 0. |
-| `LEX` | Check tokenization. Exit 0 to accept or 1 to reject. |
 | `SEMANTIC` | Check a complete program through semantic analysis. Exit 0 to accept or 1 to reject. |
 | `CODEGEN` | Compile codegen and optimization testcases and write RV32IM assembly to `{output}` for the default `RUN`. |
 | `RUN` | Run `{output}`. Optional `{stdout}` and `{profile}` placeholders select per-execution output and profiling files. |
@@ -72,7 +71,7 @@ REIMU starts at the assembly's global `main` symbol and provides its supported l
 
 Tests reside in `tests/`, and are organized into subdirectories. We recommend you follow the "namespace:test-suite:testcase" pattern. For instance, `official:semantic:arrays` is the `arrays` testcase in the `semantic` test suite of the `official` namespace.
 
-Each testcase can have one or more source files, optional input and output files and a compulsory `manifest.json` file which defines the format of the testcase. See [the official schema](tests/official/manifest.schema.json) for details. The manifest's `stage` argument determines how the testcase runs: `lex` uses `LEX`, `semantic` uses `SEMANTIC`, while `codegen` and `optimization` use `CODEGEN` followed by `RUN`.
+Each testcase can have one or more source files, optional input and output files and a compulsory `manifest.json` file which defines the format of the testcase. See [the official schema](tests/official/manifest.schema.json) for details. The manifest's `stage` argument determines how the testcase runs: `semantic` uses `SEMANTIC`, while `codegen` and `optimization` use `CODEGEN` followed by `RUN`.
 
 You are encouraged to add your own testcases under `tests/custom`. The runner will find them automatically.
 
@@ -80,11 +79,11 @@ Requirements for each kind of testcase:
 
 | Testcase Type | Requirements |
 | --- | --- |
-| Lex / Semantic | The compiler must exit 0 or 1 to match `compilation_success`. Other exit codes, signals, and timeouts fail the case. |
+| Semantic | The compiler must exit 0 or 1 to match `compilation_success`. Other exit codes, signals, and timeouts fail the case. |
 | Codegen | Compilation must exit 0 and create `{output}`. Each `io` pair runs the artifact and the output must match the expected file. |
 | Optimization | Same as Codegen, with cycle reporting when `RUN` provides `{profile}`. |
 
-Lexer tests check acceptance or rejection only; `metadata.tokens` is not compared. Testcases with type `parse` are still skipped. The current `LEX` command uses `--stage frontend`, which currently performs only lexical checks. Once frontend includes parsing, give `LEX` a separate lexer-only stage.
+Testcases with type `lex` and `parse` will be skipped since we already provide the G4 grammar. Extend the Makefile if you want to DIY these stages.
 
 ## Running tests
 
@@ -92,15 +91,12 @@ Run from the project root:
 
 ```sh
 make test
-make test FILTER=official:lexer BUILD='cargo build --locked' VERBOSE=true
 make test FILTER=official:semantic
 make test FILTER=official:codegen:arrays,official:optimization
 make test FILTER=custom
 make test FILTER=official:optimization COMPILE_TIMEOUT=60 RUN_TIMEOUT=30
 make test VERBOSE=true
 ```
-
-For lexer-only tests, the command above overrides the reference compiler build with a build of the local Rust binary. The default `BUILD` still builds the reference runtime; build the local binary separately before running all suites.
 
 Supported environment variables include:
 
