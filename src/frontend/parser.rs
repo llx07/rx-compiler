@@ -19,7 +19,7 @@ where
             return;
         }
         *(self.diagnostic.lock().unwrap()) =
-            Some(Diagnostic::new(event.message, event.line, event.column));
+            Some(Diagnostic::new(event.message, event.span.clone().unwrap()));
     }
 }
 
@@ -42,7 +42,7 @@ pub fn parse(tokens: CommonTokenStream<RxLexer<InputStream>>) -> CompileResult<(
     let root = match result {
         Ok(root) => root,
         Err(_) => {
-            return Err(Diagnostic::new("unkown error at parser", 1, 0));
+            return Err(Diagnostic::new("unkown error at parser", 0..0));
         }
     };
 

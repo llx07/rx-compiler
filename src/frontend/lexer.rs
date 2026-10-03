@@ -11,8 +11,7 @@ pub fn parse(source: &str) -> CompileResult<CommonTokenStream<RxLexer<InputStrea
             rx_lexer::INVALID_CHARACTER_LITERAL => {
                 return Err(Diagnostic::new(
                     "Lexer error: character literal is not supported in Rx",
-                    token.line(),
-                    token.column(),
+                    token.byte_span().unwrap(),
                 ));
             }
             rx_lexer::INVALID_LIFETIME => {
@@ -21,29 +20,25 @@ pub fn parse(source: &str) -> CompileResult<CommonTokenStream<RxLexer<InputStrea
                         "Lexer error: {} is not a valid lifetime",
                         token.text().unwrap()
                     ),
-                    token.line(),
-                    token.column(),
+                    token.byte_span().unwrap(),
                 ));
             }
             rx_lexer::INVALID_NUMBER => {
                 return Err(Diagnostic::new(
                     "Lexer error: invalid number literal",
-                    token.line(),
-                    token.column(),
+                    token.byte_span().unwrap(),
                 ));
             }
             rx_lexer::ERROR_CHAR => {
                 return Err(Diagnostic::new(
                     "Lexer error: unkown character",
-                    token.line(),
-                    token.column(),
+                    token.byte_span().unwrap(),
                 ));
             }
             rx_lexer::UNTERMINATED_BLOCK_COMMENT => {
                 return Err(Diagnostic::new(
                     "Lexer error: unterminated block comment",
-                    token.line(),
-                    token.column(),
+                    token.byte_span().unwrap(),
                 ));
             }
             _ => {}

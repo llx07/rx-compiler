@@ -1,16 +1,16 @@
+pub type Span = std::ops::Range<usize>;
+
 #[derive(Debug)]
 pub struct Diagnostic {
     pub message: String,
-    pub line: usize,
-    pub column: usize,
+    pub span: Span,
 }
 
 impl Diagnostic {
-    pub fn new(message: impl Into<String>, line: usize, column: usize) -> Self {
+    pub fn new(message: impl Into<String>, span: Span) -> Self {
         Self {
             message: message.into(),
-            line,
-            column,
+            span,
         }
     }
 
@@ -20,30 +20,55 @@ impl Diagnostic {
         const BOLD: &str = "\x1b[1m";
         const RESET: &str = "\x1b[0m";
 
-        let source_line = source.lines().nth(self.line - 1).unwrap_or("");
+        let start = self.span.start.min(source.len());
+        let end = self.span.end.min(source.len()).max(start);
+
+        let line_start = source[..start].rfind('\n').map_or(0, |pos| pos + 1);
+        let line_end = source[start..]
+            .find('\n')
+            .map_or(source.len(), |pos| start + pos);
+
+        let line_end = if line_end < source.len()
+            && line_end > line_start
+            && source.as_bytes()[line_end - 1] == b'\r'
+        {
+            line_end - 1
+        } else {
+            line_end
+        };
+
+        let source_line = &source[line_start..line_end];
+
+        let line = source[..line_start].bytes().filter(|&b| b == b'\n').count() + 1;
+        let column = source[line_start..start].chars().count();
+
+        let span_end_on_line = end.min(line_end);
+        let marker_len = source[start..span_end_on_line].chars().count().max(1);
+
+        let width = line.to_string().len();
 
         eprintln!("{BOLD}{RED}error{RESET}: {}", self.message);
-        let width = self.line.to_string().len();
 
         eprintln!(
             "{:>width$}{BLUE}--> {RESET}{}:{}:{}",
             "",
             filename,
-            self.line,
-            self.column + 1
+            line,
+            column + 1
         );
         eprintln!("{BLUE}{:>width$} |{RESET}", "", width = width);
         eprintln!(
             "{BLUE}{:>width$} |{RESET} {}",
-            self.line,
+            line,
             source_line,
             width = width
         );
         eprintln!(
-            "{BLUE}{:>width$} |{RESET} {}{RED}^{RESET}",
+            "{BLUE}{:>width$} |{RESET} {}{RED}{}{RESET}",
             "",
-            " ".repeat(self.column),
-            width = width
+            " ".repeat(column),
+            "^".repeat(marker_len),
+            width = width,
         );
     }
 }
