@@ -93,7 +93,7 @@ pub enum ConstValueKind {
 }
 
 pub struct IntLiteral {
-    pub raw: String,
+    pub raw: String, // raw does not contain suffix
     pub suffix: Option<IntSuffix>,
 }
 

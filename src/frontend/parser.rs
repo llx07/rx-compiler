@@ -1,8 +1,12 @@
 use std::sync::{Arc, Mutex};
 
-use antlr4_runtime::{CommonTokenStream, ErrorListener, InputStream, Recognizer, SyntaxErrorEvent};
+use antlr4_runtime::{
+    CommonTokenStream, ErrorListener, InputStream, NodeId, Recognizer, SyntaxErrorEvent,
+};
 
 use crate::diagnostic::{CompileResult, Diagnostic};
+use crate::frontend::ast::Crate;
+use crate::frontend::ast_builder::build_ast;
 use crate::generated::rx_lexer::RxLexer;
 use crate::generated::rx_parser::RxParser;
 
@@ -23,7 +27,7 @@ where
     }
 }
 
-pub fn parse(tokens: CommonTokenStream<RxLexer<InputStream>>) -> CompileResult<()> {
+pub fn parse(tokens: CommonTokenStream<RxLexer<InputStream>>) -> CompileResult<Crate> {
     let mut parser = RxParser::new(tokens);
     parser.remove_error_listeners();
 
@@ -41,10 +45,12 @@ pub fn parse(tokens: CommonTokenStream<RxLexer<InputStream>>) -> CompileResult<(
 
     let root = match result {
         Ok(root) => root,
-        Err(_) => {
-            return Err(Diagnostic::new("unkown error at parser", 0..0));
+        Err(err) => {
+            return Err(Diagnostic::new(format!("parser error: {err}"), 0..0));
         }
     };
 
-    return Ok(());
+    let parsed = parser.into_parsed_file(root);
+
+    build_ast(&parsed)
 }
