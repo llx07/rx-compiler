@@ -33,7 +33,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let source = fs::read_to_string(&args.file)?;
 
-    let tokens= match frontend::lexer_parse(&source) {
+    let tokens = match frontend::lexer::parse(&source) {
         Ok(tokens) => tokens,
         Err(diag) => {
             diag.show(args.file.to_str().unwrap(), &source);
@@ -55,7 +55,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         return Ok(());
     }
 
-    let ast = match frontend::parser_parse(tokens) {
+    let ast = match frontend::parser::parse(tokens) {
         Ok(ast) => ast,
         Err(diag) => {
             diag.show(args.file.to_str().unwrap(), &source);
