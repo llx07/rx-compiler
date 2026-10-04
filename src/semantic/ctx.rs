@@ -2,12 +2,14 @@ use std::collections::{HashMap, hash_map::Entry};
 
 use crate::frontend::ast::AstNodeId;
 
-pub struct GlobalNamespace<I, D> {
+/// IDs are local to this namespace and must be queried through the same instance.
+#[derive(Debug)]
+pub struct Namespace<I, D> {
     names: HashMap<String, I>,
     definitions: Vec<D>,
 }
 
-impl<I, D> GlobalNamespace<I, D>
+impl<I, D> Namespace<I, D>
 where
     I: Copy + From<u32> + Into<u32>,
 {
@@ -24,6 +26,10 @@ where
 
     pub fn get(&self, id: I) -> &D {
         &self.definitions[id.into() as usize]
+    }
+
+    pub fn get_mut(&mut self, id: I) -> &mut D {
+        &mut self.definitions[id.into() as usize]
     }
 
     /// Defines a name, returning its new ID or the existing ID on a duplicate.
@@ -47,6 +53,9 @@ pub struct TypeId(u32);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ValueId(u32);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct FieldId(u32);
 
 impl From<u32> for TypeId {
     fn from(value: u32) -> Self {
@@ -72,20 +81,33 @@ impl From<ValueId> for u32 {
     }
 }
 
+impl From<u32> for FieldId {
+    fn from(value: u32) -> Self {
+        Self(value)
+    }
+}
+
+impl From<FieldId> for u32 {
+    fn from(id: FieldId) -> Self {
+        id.0
+    }
+}
+
 pub struct DefTable {
-    pub types: GlobalNamespace<TypeId, TypeDef>,
-    pub values: GlobalNamespace<ValueId, ValueDef>,
+    pub types: Namespace<TypeId, TypeDef>,
+    pub values: Namespace<ValueId, ValueDef>,
 }
 
 impl DefTable {
     pub fn new() -> Self {
         Self {
-            types: GlobalNamespace::new(),
-            values: GlobalNamespace::new(),
+            types: Namespace::new(),
+            values: Namespace::new(),
         }
     }
 }
 
+#[derive(Debug)]
 pub struct TypeDef {
     pub name: String,
     /// The enclosing item ID for source declarations; `None` for builtins.
@@ -93,12 +115,34 @@ pub struct TypeDef {
     pub kind: TypeDefKind,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug)]
 pub enum TypeDefKind {
     Builtin,
-    Struct,
+    Struct(StructDef),
 }
 
+#[derive(Debug)]
+pub struct StructDef {
+    pub fields: Namespace<FieldId, FieldDef>,
+    pub associated_values: Namespace<ValueId, ValueDef>,
+}
+
+impl StructDef {
+    pub fn new() -> Self {
+        Self {
+            fields: Namespace::new(),
+            associated_values: Namespace::new(),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct FieldDef {
+    pub name: String,
+    pub ast_node_id: AstNodeId,
+}
+
+#[derive(Debug)]
 pub struct ValueDef {
     pub name: String,
     /// The enclosing item or associated item ID; `None` for builtins.
