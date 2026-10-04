@@ -1,8 +1,8 @@
 use crate::frontend::ast::{
-    ArrayExpr, AssociatedItem, AssociatedItemKind, Binding, BlockExpr, ConstItem, ConstValue,
-    ConstValueKind, Crate, Derive, ElseBranch, Expr, ExprKind, ExprStmt, Function, Ident, Impl,
-    Item, ItemKind, LetStmt, LoopExpr, Param, Path, PathIdent, PathSegment, Receiver, Stmt,
-    StmtKind, Struct, StructExprField, StructField, TyAst, TyAstKind,
+    ArrayExpr, AssociatedItem, AssociatedItemKind, BlockExpr, ConstItem, ConstValue,
+    ConstValueKind, Crate, ElseBranch, Expr, ExprKind, ExprStmt, Function, Impl, Item, ItemKind,
+    LetStmt, LoopExpr, Param, Path, PathSegment, Stmt, StmtKind, Struct, StructExprField,
+    StructField, TyAst, TyAstKind,
 };
 
 pub trait Visitor {

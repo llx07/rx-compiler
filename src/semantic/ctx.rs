@@ -1,5 +1,7 @@
 use std::collections::{HashMap, hash_map::Entry};
 
+use crate::frontend::ast::AstNodeId;
+
 pub struct GlobalNamespace<I, D> {
     names: HashMap<String, I>,
     definitions: Vec<D>,
@@ -86,10 +88,29 @@ impl DefTable {
 
 pub struct TypeDef {
     pub name: String,
+    /// The enclosing item ID for source declarations; `None` for builtins.
+    pub ast_node_id: Option<AstNodeId>,
+    pub kind: TypeDefKind,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TypeDefKind {
+    Builtin,
+    Struct,
 }
 
 pub struct ValueDef {
     pub name: String,
+    /// The enclosing item or associated item ID; `None` for builtins.
+    pub ast_node_id: Option<AstNodeId>,
+    pub kind: ValueDefKind,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ValueDefKind {
+    BuiltinFunction,
+    Function,
+    Const,
 }
 
 pub struct SemanticCtx {
