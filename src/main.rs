@@ -15,6 +15,7 @@ use antlr4_runtime::Token as _;
 use clap::{Parser, ValueEnum};
 
 use crate::generated::rx_lexer;
+use crate::semantic::semantic_check::semantic_check;
 
 #[derive(Parser)]
 
@@ -82,6 +83,23 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
 
     if args.stage == CompileStage::Parser {
+        let mut output = output_writer(args.output.as_deref())?;
+        writeln!(output, "{:#?}", ast)?;
+        output.flush()?;
+        return Ok(());
+    }
+
+    let ctx = match semantic_check(&ast) {
+        Ok(ctx) => ctx,
+        Err(diags) => {
+            for diag in diags {
+                diag.show(args.file.to_str().unwrap(), &source);
+            }
+            std::process::exit(1);
+        }
+    };
+
+    if args.stage == CompileStage::Semantic {
         let mut output = output_writer(args.output.as_deref())?;
         writeln!(output, "{:#?}", ast)?;
         output.flush()?;
