@@ -57,6 +57,9 @@ pub struct ValueId(u32);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct FieldId(u32);
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct LocalId(u32);
+
 impl From<u32> for TypeId {
     fn from(value: u32) -> Self {
         Self(value)
@@ -89,6 +92,18 @@ impl From<u32> for FieldId {
 
 impl From<FieldId> for u32 {
     fn from(id: FieldId) -> Self {
+        id.0
+    }
+}
+
+impl From<u32> for LocalId {
+    fn from(value: u32) -> Self {
+        Self(value)
+    }
+}
+
+impl From<LocalId> for u32 {
+    fn from(id: LocalId) -> Self {
         id.0
     }
 }
@@ -157,14 +172,51 @@ pub enum ValueDefKind {
     Const,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DefId {
+    Type(TypeId),
+    GlobalValue(ValueId),
+    AssociatedValue { owner: TypeId, value: ValueId },
+    Local(LocalId),
+    Field { owner: TypeId, field: FieldId },
+}
+
+pub struct LocalTable {
+    table: Vec<LocalDef>,
+}
+
+impl LocalTable {
+    pub fn new() -> Self {
+        Self { table: Vec::new() }
+    }
+}
+
+#[derive(Debug)]
+pub struct LocalDef {
+    pub name: String,
+    pub ast_node_id: AstNodeId,
+    pub kind: LocalDefKind,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LocalDefKind {
+    Param,
+    Let,
+    Receiver,
+}
+
 pub struct SemanticCtx {
     pub defs: DefTable,
+    pub locals: LocalTable,
+    pub bindings: HashMap<AstNodeId, DefId>,
 }
 
 impl SemanticCtx {
     pub fn new() -> Self {
         Self {
             defs: DefTable::new(),
+            locals: LocalTable::new(),
+            bindings: HashMap::new(),
         }
     }
 }
