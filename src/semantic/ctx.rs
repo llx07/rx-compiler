@@ -243,4 +243,13 @@ impl SemanticCtx {
     pub fn get_type_mut(&mut self, id: TypeId) -> &mut TypeDef {
         self.defs.types.get_mut(id)
     }
+
+    pub fn bind(&mut self, node: AstNodeId, def: DefId) {
+        let old = self.bindings.insert(node, def);
+        debug_assert!(old.is_none());
+    }
+
+    pub fn binding(&self, node: AstNodeId) -> Option<DefId> {
+        self.bindings.get(&node).copied()
+    }
 }

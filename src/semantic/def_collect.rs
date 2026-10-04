@@ -3,7 +3,8 @@ use crate::{
     frontend::ast::{AssociatedItemKind, AstNodeId, Crate, ItemKind, PathIdent, TyAst, TyAstKind},
     semantic::{
         ctx::{
-            FieldDef, SemanticCtx, StructDef, TypeDef, TypeDefKind, TypeId, ValueDef, ValueDefKind,
+            DefId, FieldDef, SemanticCtx, StructDef, TypeDef, TypeDefKind, TypeId, ValueDef,
+            ValueDefKind,
         },
         visitor::{Visitor, walk_item},
     },
@@ -25,41 +26,53 @@ impl<'a> Visitor for DefCollector<'a> {
 
     fn visit_function(&mut self, node: &crate::frontend::ast::Function) {
         let name = &node.name.name;
-        if let Err(_) = self.ctx.define_value(
+        let ast_node_id = self.current_item_id.expect("function must be in an item");
+
+        match self.ctx.define_value(
             name.clone(),
             ValueDef {
                 name: name.clone(),
-                ast_node_id: Some(self.current_item_id.expect("function must be in an item")),
+                ast_node_id: Some(ast_node_id),
                 kind: ValueDefKind::Function,
             },
         ) {
-            self.diagnostics.push(Diagnostic {
+            Ok(id) => {
+                self.ctx.bind(ast_node_id, DefId::GlobalValue(id));
+            }
+            Err(_) => self.diagnostics.push(Diagnostic {
                 message: format!("Duplicate definition of {}", name),
                 span: node.name.span.clone(),
-            });
+            }),
         }
     }
 
     fn visit_const_item(&mut self, node: &crate::frontend::ast::ConstItem) {
         let name = &node.name.name;
-        if let Err(_) = self.ctx.define_value(
+        let ast_node_id = self.current_item_id.expect("const item must be in an item");
+
+        match self.ctx.define_value(
             name.clone(),
             ValueDef {
                 name: name.clone(),
-                ast_node_id: Some(self.current_item_id.expect("const item must be in an item")),
+                ast_node_id: Some(ast_node_id),
                 kind: ValueDefKind::Const,
             },
         ) {
-            self.diagnostics.push(Diagnostic {
+            Ok(id) => {
+                self.ctx.bind(ast_node_id, DefId::GlobalValue(id));
+            }
+            Err(_) => self.diagnostics.push(Diagnostic {
                 message: format!("Duplicate definition of {}", name),
                 span: node.name.span.clone(),
-            });
+            }),
         }
     }
 
     fn visit_struct(&mut self, node: &crate::frontend::ast::Struct) {
         let name = &node.name.name;
+        let ast_node_id = self.current_item_id.expect("struct must be in an item");
         let mut structure = StructDef::new();
+
         for field in &node.fields {
             let name = &field.name.name;
             if structure
@@ -79,18 +92,21 @@ impl<'a> Visitor for DefCollector<'a> {
                 ));
             }
         }
-        if let Err(_) = self.ctx.define_type(
+        match self.ctx.define_type(
             name.clone(),
             TypeDef {
                 name: name.clone(),
-                ast_node_id: Some(self.current_item_id.expect("struct must be in an item")),
+                ast_node_id: Some(ast_node_id),
                 kind: TypeDefKind::Struct(structure),
             },
         ) {
-            self.diagnostics.push(Diagnostic {
+            Ok(id) => {
+                self.ctx.bind(ast_node_id, DefId::Type(id));
+            }
+            Err(_) => self.diagnostics.push(Diagnostic {
                 message: format!("Duplicate definition of {}", name),
                 span: node.name.span.clone(),
-            });
+            }),
         }
     }
 
@@ -102,7 +118,7 @@ impl<'a> Visitor for DefCollector<'a> {
 pub fn def_collect(ast: &Crate, ctx: &mut SemanticCtx, diagnostics: &mut Vec<Diagnostic>) {
     DefCollector {
         ctx,
-        diagnostics: diagnostics,
+        diagnostics,
         current_item_id: None,
     }
     .visit_crate(ast);
@@ -124,17 +140,19 @@ fn collect_impls(ast: &Crate, ctx: &mut SemanticCtx, diagnostics: &mut Vec<Diagn
                 continue;
             }
         };
-        let TypeDefKind::Struct(structure) = &mut ctx.get_type_mut(target).kind else {
-            unreachable!("resolved impl target must be a user struct");
-        };
+        ctx.bind(implementation.ty.id, DefId::Type(target));
+
         for item in &implementation.items {
             let (name, kind) = match &item.kind {
                 AssociatedItemKind::Function(function) => (&function.name, ValueDefKind::Function),
                 AssociatedItemKind::ConstItem(constant) => (&constant.name, ValueDefKind::Const),
             };
-            if structure
-                .associated_values
-                .define(
+
+            let result = {
+                let TypeDefKind::Struct(structure) = &mut ctx.get_type_mut(target).kind else {
+                    unreachable!("resolved impl target must be a user struct");
+                };
+                structure.associated_values.define(
                     name.name.clone(),
                     ValueDef {
                         name: name.name.clone(),
@@ -142,12 +160,24 @@ fn collect_impls(ast: &Crate, ctx: &mut SemanticCtx, diagnostics: &mut Vec<Diagn
                         kind,
                     },
                 )
-                .is_err()
-            {
-                diagnostics.push(Diagnostic::new(
-                    format!("Duplicate associated value definition of {}", name.name),
-                    name.span.clone(),
-                ));
+            };
+
+            match result {
+                Ok(id) => {
+                    ctx.bind(
+                        item.id,
+                        DefId::AssociatedValue {
+                            owner: target,
+                            value: id,
+                        },
+                    );
+                }
+                Err(_) => {
+                    diagnostics.push(Diagnostic::new(
+                        format!("Duplicate associated value definition of {}", name.name),
+                        name.span.clone(),
+                    ));
+                }
             }
         }
     }
@@ -189,5 +219,6 @@ fn resolve_impl_target(ty: &TyAst, ctx: &SemanticCtx) -> Result<TypeId, Diagnost
             ty.span.clone(),
         ));
     }
+
     Ok(id)
 }
