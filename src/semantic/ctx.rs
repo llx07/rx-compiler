@@ -206,9 +206,9 @@ pub enum LocalDefKind {
 }
 
 pub struct SemanticCtx {
-    pub defs: DefTable,
-    pub locals: LocalTable,
-    pub bindings: HashMap<AstNodeId, DefId>,
+    defs: DefTable,
+    locals: LocalTable,
+    bindings: HashMap<AstNodeId, DefId>,
 }
 
 impl SemanticCtx {
@@ -218,5 +218,29 @@ impl SemanticCtx {
             locals: LocalTable::new(),
             bindings: HashMap::new(),
         }
+    }
+
+    pub fn define_type(&mut self, name: String, def: TypeDef) -> Result<TypeId, TypeId> {
+        self.defs.types.define(name, def)
+    }
+
+    pub fn define_value(&mut self, name: String, def: ValueDef) -> Result<ValueId, ValueId> {
+        self.defs.values.define(name, def)
+    }
+
+    pub fn lookup_type(&self, name: &str) -> Option<TypeId> {
+        self.defs.types.lookup(name)
+    }
+
+    pub fn lookup_value(&self, name: &str) -> Option<ValueId> {
+        self.defs.values.lookup(name)
+    }
+
+    pub fn get_type(&self, id: TypeId) -> &TypeDef {
+        self.defs.types.get(id)
+    }
+
+    pub fn get_type_mut(&mut self, id: TypeId) -> &mut TypeDef {
+        self.defs.types.get_mut(id)
     }
 }

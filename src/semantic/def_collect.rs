@@ -3,14 +3,14 @@ use crate::{
     frontend::ast::{AssociatedItemKind, AstNodeId, Crate, ItemKind, PathIdent, TyAst, TyAstKind},
     semantic::{
         ctx::{
-            DefTable, FieldDef, StructDef, TypeDef, TypeDefKind, TypeId, ValueDef, ValueDefKind,
+            FieldDef, SemanticCtx, StructDef, TypeDef, TypeDefKind, TypeId, ValueDef, ValueDefKind,
         },
         visitor::{Visitor, walk_item},
     },
 };
 
 pub struct DefCollector<'a> {
-    defs: &'a mut DefTable,
+    ctx: &'a mut SemanticCtx,
     diagnostics: &'a mut Vec<Diagnostic>,
 
     current_item_id: Option<AstNodeId>,
@@ -25,7 +25,7 @@ impl<'a> Visitor for DefCollector<'a> {
 
     fn visit_function(&mut self, node: &crate::frontend::ast::Function) {
         let name = &node.name.name;
-        if let Err(_) = self.defs.values.define(
+        if let Err(_) = self.ctx.define_value(
             name.clone(),
             ValueDef {
                 name: name.clone(),
@@ -42,7 +42,7 @@ impl<'a> Visitor for DefCollector<'a> {
 
     fn visit_const_item(&mut self, node: &crate::frontend::ast::ConstItem) {
         let name = &node.name.name;
-        if let Err(_) = self.defs.values.define(
+        if let Err(_) = self.ctx.define_value(
             name.clone(),
             ValueDef {
                 name: name.clone(),
@@ -79,7 +79,7 @@ impl<'a> Visitor for DefCollector<'a> {
                 ));
             }
         }
-        if let Err(_) = self.defs.types.define(
+        if let Err(_) = self.ctx.define_type(
             name.clone(),
             TypeDef {
                 name: name.clone(),
@@ -99,32 +99,32 @@ impl<'a> Visitor for DefCollector<'a> {
     }
 }
 
-pub fn def_collect(ast: &Crate, defs: &mut DefTable, diagnostics: &mut Vec<Diagnostic>) {
+pub fn def_collect(ast: &Crate, ctx: &mut SemanticCtx, diagnostics: &mut Vec<Diagnostic>) {
     DefCollector {
-        defs: defs,
+        ctx,
         diagnostics: diagnostics,
         current_item_id: None,
     }
     .visit_crate(ast);
 
     if diagnostics.is_empty() {
-        collect_impls(ast, defs, diagnostics);
+        collect_impls(ast, ctx, diagnostics);
     }
 }
 
-fn collect_impls(ast: &Crate, defs: &mut DefTable, diagnostics: &mut Vec<Diagnostic>) {
+fn collect_impls(ast: &Crate, ctx: &mut SemanticCtx, diagnostics: &mut Vec<Diagnostic>) {
     for item in &ast.items {
         let ItemKind::Impl(implementation) = &item.kind else {
             continue;
         };
-        let target = match resolve_impl_target(&implementation.ty, defs) {
+        let target = match resolve_impl_target(&implementation.ty, ctx) {
             Ok(target) => target,
             Err(diagnostic) => {
                 diagnostics.push(diagnostic);
                 continue;
             }
         };
-        let TypeDefKind::Struct(structure) = &mut defs.types.get_mut(target).kind else {
+        let TypeDefKind::Struct(structure) = &mut ctx.get_type_mut(target).kind else {
             unreachable!("resolved impl target must be a user struct");
         };
         for item in &implementation.items {
@@ -153,7 +153,7 @@ fn collect_impls(ast: &Crate, defs: &mut DefTable, diagnostics: &mut Vec<Diagnos
     }
 }
 
-fn resolve_impl_target(ty: &TyAst, defs: &DefTable) -> Result<TypeId, Diagnostic> {
+fn resolve_impl_target(ty: &TyAst, ctx: &SemanticCtx) -> Result<TypeId, Diagnostic> {
     let TyAstKind::Path(path) = &ty.kind else {
         return Err(Diagnostic::new(
             "Impl target must be a user struct name",
@@ -176,14 +176,14 @@ fn resolve_impl_target(ty: &TyAst, defs: &DefTable) -> Result<TypeId, Diagnostic
         ));
     }
 
-    let id = defs.types.lookup(&name.name).ok_or_else(|| {
+    let id = ctx.lookup_type(&name.name).ok_or_else(|| {
         Diagnostic::new(
             format!("Unknown impl target {}", name.name),
             name.span.clone(),
         )
     })?;
 
-    if !matches!(&defs.types.get(id).kind, TypeDefKind::Struct(_)) {
+    if !matches!(&ctx.get_type(id).kind, TypeDefKind::Struct(_)) {
         return Err(Diagnostic::new(
             "Impl target must be a user struct name",
             ty.span.clone(),
