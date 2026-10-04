@@ -1,6 +1,7 @@
 mod diagnostic;
 mod frontend;
 mod generated;
+mod id_alloc;
 
 use std::path::PathBuf;
 use std::{error::Error, fs};
@@ -29,7 +30,6 @@ enum CompileStage {
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args = Args::parse();
-    // println!("{:?} {:?}", args.file.to_str(), args.stage);
 
     let source = fs::read_to_string(&args.file)?;
 
@@ -63,6 +63,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     };
 
+    if args.stage == CompileStage::Parser {
+        println!("{:#?}", ast);
+        return Ok(());
+    }
+
     Ok(())
-    // return compile();
 }

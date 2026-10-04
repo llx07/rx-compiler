@@ -1,8 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use antlr4_runtime::{
-    CommonTokenStream, ErrorListener, InputStream, NodeId, Recognizer, SyntaxErrorEvent,
-};
+use antlr4_runtime::{CommonTokenStream, ErrorListener, InputStream, Recognizer, SyntaxErrorEvent};
 
 use crate::diagnostic::{CompileResult, Diagnostic};
 use crate::frontend::ast::Crate;
