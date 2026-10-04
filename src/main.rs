@@ -3,8 +3,12 @@ mod frontend;
 mod generated;
 mod id_alloc;
 
-use std::path::PathBuf;
-use std::{error::Error, fs};
+use std::path::{Path, PathBuf};
+use std::{
+    error::Error,
+    fs,
+    io::{self, Write},
+};
 
 use antlr4_runtime::Token as _;
 use clap::{Parser, ValueEnum};
@@ -17,6 +21,8 @@ struct Args {
     file: PathBuf,
     #[arg(long, short, value_enum)]
     stage: CompileStage,
+    #[arg(short, long, value_name = "FILE")]
+    output: Option<PathBuf>,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]
@@ -26,6 +32,14 @@ enum CompileStage {
     Parser,
     Semantic,
     CodeGen,
+}
+
+fn output_writer(path: Option<&Path>) -> io::Result<io::BufWriter<Box<dyn Write>>> {
+    let writer: Box<dyn Write> = match path {
+        Some(path) => Box::new(fs::File::create(path)?),
+        None => Box::new(io::stdout().lock()),
+    };
+    Ok(io::BufWriter::new(writer))
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -43,15 +57,18 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     if args.stage == CompileStage::Lexer {
         let vocabulary = rx_lexer::metadata().vocabulary();
+        let mut output = output_writer(args.output.as_deref())?;
 
         for token in tokens.tokens() {
-            println!(
+            writeln!(
+                output,
                 "type={} channel={} text={:?}",
                 vocabulary.display_name(token.token_type()),
                 token.channel(),
                 token.text(),
-            );
+            )?;
         }
+        output.flush()?;
         return Ok(());
     }
 
@@ -64,7 +81,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
 
     if args.stage == CompileStage::Parser {
-        println!("{:#?}", ast);
+        let mut output = output_writer(args.output.as_deref())?;
+        writeln!(output, "{:#?}", ast)?;
+        output.flush()?;
         return Ok(());
     }
 

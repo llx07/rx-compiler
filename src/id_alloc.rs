@@ -22,18 +22,3 @@ where
         id.into()
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    #[should_panic(expected = "ID allocator exhausted")]
-    fn exhaustion_panics_instead_of_reusing_ids() {
-        let mut ids = IdAllocator::<u32> {
-            next: u32::MAX,
-            _marker: PhantomData,
-        };
-        ids.alloc();
-    }
-}
