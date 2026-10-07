@@ -4,6 +4,7 @@ use crate::{
     semantic::{
         ctx::{SemanticCtx, TypeDef, TypeDefKind, ValueDef, ValueDefKind},
         def_collect::def_collect,
+        name_res::name_resolve,
     },
 };
 
@@ -35,6 +36,12 @@ pub fn semantic_check(ast: &Crate) -> Result<SemanticCtx, Vec<Diagnostic>> {
     }
 
     def_collect(ast, &mut ctx, &mut diagnostics);
+
+    if !diagnostics.is_empty() {
+        return Err(diagnostics);
+    }
+
+    name_resolve(ast, &mut ctx, &mut diagnostics);
 
     if !diagnostics.is_empty() {
         return Err(diagnostics);

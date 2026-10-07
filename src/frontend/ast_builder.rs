@@ -221,6 +221,7 @@ impl AstBuilder {
         }
 
         Ok(Param {
+            id: self.ids.alloc(),
             binding: binding.expect("parameter must have a binding"),
             ty: ty.expect("parameter must have a type"),
             span: node_span(node),
@@ -524,7 +525,6 @@ impl AstBuilder {
         };
 
         Ok(Some(Stmt {
-            id: self.ids.alloc(),
             kind: kind,
             span: node_span(node),
         }))
@@ -547,6 +547,8 @@ impl AstBuilder {
         }
 
         Ok(LetStmt {
+            id: self.ids.alloc(),
+
             binding: binding.expect("let statement must have a binding"),
             ty: ty,
             expr: expr.expect("let statement must have an expression"),

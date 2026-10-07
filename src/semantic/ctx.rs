@@ -189,12 +189,23 @@ impl LocalTable {
     pub fn new() -> Self {
         Self { table: Vec::new() }
     }
+
+    pub fn alloc(&mut self, def: LocalDef) -> LocalId {
+        let id = LocalId(u32::try_from(self.table.len()).expect("local ID space exhausted"));
+        self.table.push(def);
+        id
+    }
+
+    pub fn get(&self, id: LocalId) -> &LocalDef {
+        &self.table[id.0 as usize]
+    }
 }
 
 #[derive(Debug)]
 pub struct LocalDef {
     pub name: String,
     pub ast_node_id: AstNodeId,
+    pub is_mut: bool,
     pub kind: LocalDefKind,
 }
 
@@ -202,7 +213,7 @@ pub struct LocalDef {
 pub enum LocalDefKind {
     Param,
     Let,
-    Receiver,
+    Receiver { ty: TypeId },
 }
 
 pub struct SemanticCtx {
@@ -251,5 +262,13 @@ impl SemanticCtx {
 
     pub fn binding(&self, node: AstNodeId) -> Option<DefId> {
         self.bindings.get(&node).copied()
+    }
+
+    pub fn alloc_local(&mut self, def: LocalDef) -> LocalId {
+        self.locals.alloc(def)
+    }
+
+    pub fn get_local(&self, id: LocalId) -> &LocalDef {
+        self.locals.get(id)
     }
 }

@@ -55,6 +55,7 @@ pub struct Receiver {
 
 #[derive(Debug)]
 pub struct Param {
+    pub id: AstNodeId,
     pub binding: Binding,
     pub ty: TyAst,
     pub span: Span,
@@ -158,7 +159,6 @@ pub enum AssociatedItemKind {
 
 #[derive(Debug)]
 pub struct Stmt {
-    pub id: AstNodeId,
     pub kind: StmtKind,
     pub span: Span,
 }
@@ -171,6 +171,7 @@ pub enum StmtKind {
 
 #[derive(Debug)]
 pub struct LetStmt {
+    pub id: AstNodeId,
     pub binding: Binding,
     pub ty: Option<TyAst>,
     pub expr: Expr,
