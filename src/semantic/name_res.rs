@@ -149,7 +149,9 @@ impl<'a> Visitor for NameResolution<'a> {
         if let ExprKind::Path(path) = &node.kind {
             match self.resolve_expr_path(path) {
                 Ok(id) => {
-                    self.ctx.bind(node.id, id);
+                    if let Some(id) = id {
+                        self.ctx.bind(node.id, id);
+                    }
                 }
                 Err(diag) => {
                     self.diagnostics.push(diag);
@@ -208,7 +210,7 @@ impl<'a> NameResolution<'a> {
         }
     }
 
-    fn resolve_expr_path(&self, path: &Path) -> Result<DefId, Diagnostic> {
+    fn resolve_expr_path(&self, path: &Path) -> Result<Option<DefId>, Diagnostic> {
         match path.segments.as_slice() {
             [segment] => self.resolve_unqualified_value(segment),
 
@@ -223,7 +225,10 @@ impl<'a> NameResolution<'a> {
         }
     }
 
-    fn resolve_unqualified_value(&self, path_seg: &PathSegment) -> Result<DefId, Diagnostic> {
+    fn resolve_unqualified_value(
+        &self,
+        path_seg: &PathSegment,
+    ) -> Result<Option<DefId>, Diagnostic> {
         let name = match &path_seg.name {
             Ident(ident) => &ident.name,
             SelfValue => &"self".to_string(),
@@ -243,12 +248,12 @@ impl<'a> NameResolution<'a> {
             .find(|id| id.is_some());
 
         if let Some(found) = first_found {
-            Ok(DefId::Local(*found.expect("found is some")))
+            Ok(Some(DefId::Local(*found.expect("found is some"))))
         } else {
             // lookup in global namespace
             let global_result = self.ctx.lookup_value(name);
             if let Some(found) = global_result {
-                Ok(DefId::GlobalValue(found))
+                Ok(Some(DefId::GlobalValue(found)))
             } else {
                 Err(Diagnostic::new("name not found", path_seg.span.clone()))
             }
@@ -259,14 +264,14 @@ impl<'a> NameResolution<'a> {
         &self,
         ty_seg: &PathSegment,
         mem_seg: &PathSegment,
-    ) -> Result<DefId, Diagnostic> {
+    ) -> Result<Option<DefId>, Diagnostic> {
         let Type(ty) = self.resolve_type_segment(ty_seg)? else {
             unreachable!("must be type");
         };
 
         let ty_def = self.ctx.get_type(ty);
         let name = match &mem_seg.name {
-            Ident(ident) => &ident.name,
+            Ident(ident) => ident.name.as_str(),
             _ => {
                 return Err(Diagnostic::new(
                     "not a valid name of associated item",
@@ -274,11 +279,16 @@ impl<'a> NameResolution<'a> {
                 ));
             }
         };
+
+        if name == "clone" {
+            return Ok(None);
+        }
+
         if let Some(id) = ty_def.associated_values.lookup(name) {
-            Ok(DefId::AssociatedValue {
+            Ok(Some(DefId::AssociatedValue {
                 owner: ty,
                 value: id,
-            })
+            }))
         } else {
             Err(Diagnostic::new("name not found", mem_seg.span.clone()))
         }
