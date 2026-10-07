@@ -78,7 +78,7 @@ impl<'a> Visitor for NameResolution<'a> {
                 let self_id = self.ctx.alloc_local(LocalDef {
                     name: "self".to_string(),
                     ast_node_id: receiver.id,
-                    is_mut: receiver.is_mut,
+                    is_mut: receiver.is_mut && !receiver.is_ref,
                     kind: LocalDefKind::Receiver { ty: target },
                 });
 
