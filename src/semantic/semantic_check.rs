@@ -20,13 +20,19 @@ pub fn semantic_check(ast: &Crate) -> Result<SemanticCtx, Vec<Diagnostic>> {
             associated_values: Namespace::new(),
         };
 
-        if matches!(builtin_type, "Box" | "Vec") {
+        let associated_functions: &[&str] = match builtin_type {
+            "Box" => &["new"],
+            "Vec" => &["new", "len", "is_empty", "push", "remove"],
+            _ => &[],
+        };
+
+        for &name in associated_functions {
             type_def
                 .associated_values
                 .define(
-                    "new".to_string(),
+                    name.to_string(),
                     ValueDef {
-                        name: "new".to_string(),
+                        name: name.to_string(),
                         ast_node_id: None,
                         kind: ValueDefKind::BuiltinFunction,
                     },
