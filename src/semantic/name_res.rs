@@ -25,25 +25,25 @@ struct NameResolution<'a> {
 
     scopes: Vec<HashMap<String, LocalId>>,
 
-    curent_item_id: Option<AstNodeId>,
+    current_item_id: Option<AstNodeId>,
     current_impl_target: Option<TypeId>,
     current_self_ty: Option<TypeId>,
 }
 
 impl<'a> Visitor for NameResolution<'a> {
     fn visit_item(&mut self, node: &crate::frontend::ast::Item) {
-        self.curent_item_id = Some(node.id);
+        self.current_item_id = Some(node.id);
         walk_item(self, node);
-        self.curent_item_id = None;
+        self.current_item_id = None;
     }
 
     fn visit_struct(&mut self, node: &crate::frontend::ast::Struct) {
         let DefId::Type(ty) = self
             .ctx
-            .binding(self.curent_item_id.expect("function is an item"))
-            .expect("function must be bound in def_colelct")
+            .binding(self.current_item_id.expect("struct is an item"))
+            .expect("struct must be bound in def_colelct")
         else {
-            unreachable!("binding of function must be type");
+            unreachable!("binding of struct must be type");
         };
 
         self.current_self_ty = Some(ty);
@@ -291,7 +291,7 @@ pub fn name_resolve(ast: &Crate, ctx: &mut SemanticCtx, diagnostics: &mut Vec<Di
         diagnostics,
 
         scopes: Vec::new(),
-        curent_item_id: None,
+        current_item_id: None,
         current_impl_target: None,
         current_self_ty: None,
     }
