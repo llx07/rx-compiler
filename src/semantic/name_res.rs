@@ -3,18 +3,18 @@ use std::collections::HashMap;
 use crate::{
     diagnostic::Diagnostic,
     frontend::ast::{
-        AstNodeId, Crate, ExprKind, Path,
+        AstNodeId, ConstValueKind, Crate, ExprKind, Path,
         PathIdent::{self, Ident, SelfType, SelfValue},
         PathSegment, TyAstKind,
     },
     semantic::{
         ctx::{
             DefId::{self, Type},
-            LocalDef, LocalDefKind, LocalId, SemanticCtx, TypeId,
+            LocalDef, LocalDefKind, LocalId, SemanticCtx, TypeId, ValueDefKind,
         },
         visitor::{
-            Visitor, walk_block, walk_expr, walk_function, walk_item, walk_let_stmt, walk_struct,
-            walk_ty,
+            Visitor, walk_block, walk_const_value, walk_expr, walk_function, walk_item,
+            walk_let_stmt, walk_struct, walk_ty,
         },
     },
 };
@@ -145,6 +145,41 @@ impl<'a> Visitor for NameResolution<'a> {
             .insert(node.binding.name.name.clone(), let_id);
     }
 
+    fn visit_const_value(&mut self, node: &crate::frontend::ast::ConstValue) {
+        if let ConstValueKind::Path(path) = &node.kind {
+            let def_id = match self.resolve_expr_path(path) {
+                Ok(Some(def_id)) => def_id,
+                Ok(None) => {
+                    self.diagnostics
+                        .push(Diagnostic::new("Unknown const", node.span.clone()));
+                    return;
+                }
+                Err(diag) => {
+                    self.diagnostics.push(diag);
+                    return;
+                }
+            };
+
+            let is_const = match def_id {
+                DefId::GlobalValue(id) => self.ctx.get_value(id).kind == ValueDefKind::Const,
+                DefId::AssociatedValue { owner, value } => {
+                    self.ctx.get_type(owner).associated_values.get(value).kind
+                        == ValueDefKind::Const
+                }
+                _ => false,
+            };
+
+            if !is_const {
+                self.diagnostics
+                    .push(Diagnostic::new("Not a const value", node.span.clone()));
+                return;
+            }
+
+            self.ctx.bind(node.id, def_id);
+        }
+        walk_const_value(self, node);
+    }
+
     fn visit_expr(&mut self, node: &crate::frontend::ast::Expr) {
         if let ExprKind::Path(path) = &node.kind {
             match self.resolve_expr_path(path) {
@@ -152,6 +187,16 @@ impl<'a> Visitor for NameResolution<'a> {
                     if let Some(id) = id {
                         self.ctx.bind(node.id, id);
                     }
+                }
+                Err(diag) => {
+                    self.diagnostics.push(diag);
+                }
+            }
+        }
+        if let ExprKind::Struct(structure) = &node.kind {
+            match self.resolve_type_path(&structure.path) {
+                Ok(id) => {
+                    self.ctx.bind(structure.path.id, id);
                 }
                 Err(diag) => {
                     self.diagnostics.push(diag);

@@ -236,6 +236,10 @@ impl SemanticCtx {
         self.defs.values.lookup(name)
     }
 
+    pub fn get_value(&self, id: ValueId) -> &ValueDef {
+        self.defs.values.get(id)
+    }
+
     pub fn get_type(&self, id: TypeId) -> &TypeDef {
         self.defs.types.get(id)
     }
