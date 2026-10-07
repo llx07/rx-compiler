@@ -10,9 +10,7 @@ use crate::{
     semantic::{
         ctx::{
             DefId::{self, Type},
-            LocalDef, LocalDefKind, LocalId, SemanticCtx,
-            TypeDefKind::{Builtin, Struct},
-            TypeId,
+            LocalDef, LocalDefKind, LocalId, SemanticCtx, TypeId,
         },
         visitor::{
             Visitor, walk_block, walk_expr, walk_function, walk_item, walk_let_stmt, walk_struct,
@@ -267,33 +265,22 @@ impl<'a> NameResolution<'a> {
         };
 
         let ty_def = self.ctx.get_type(ty);
-        match &ty_def.kind {
-            Builtin => Err(Diagnostic::new(
-                format!(
-                    "builtin type {} has no associated item",
-                    ty_def.name.clone()
-                ),
-                ty_seg.span.clone(),
-            )),
-            Struct(structure) => {
-                let name = match &mem_seg.name {
-                    Ident(ident) => &ident.name,
-                    _ => {
-                        return Err(Diagnostic::new(
-                            "not a valid name of associated item",
-                            mem_seg.span.clone(),
-                        ));
-                    }
-                };
-                if let Some(id) = structure.associated_values.lookup(&name) {
-                    Ok(DefId::AssociatedValue {
-                        owner: ty,
-                        value: id,
-                    })
-                } else {
-                    Err(Diagnostic::new("name not found", mem_seg.span.clone()))
-                }
+        let name = match &mem_seg.name {
+            Ident(ident) => &ident.name,
+            _ => {
+                return Err(Diagnostic::new(
+                    "not a valid name of associated item",
+                    mem_seg.span.clone(),
+                ));
             }
+        };
+        if let Some(id) = ty_def.associated_values.lookup(name) {
+            Ok(DefId::AssociatedValue {
+                owner: ty,
+                value: id,
+            })
+        } else {
+            Err(Diagnostic::new("name not found", mem_seg.span.clone()))
         }
     }
 }

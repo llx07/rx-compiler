@@ -127,27 +127,16 @@ pub struct TypeDef {
     pub name: String,
     /// The enclosing item ID for source declarations; `None` for builtins.
     pub ast_node_id: Option<AstNodeId>,
-    pub kind: TypeDefKind,
-}
-
-#[derive(Debug)]
-pub enum TypeDefKind {
-    Builtin,
-    Struct(StructDef),
-}
-
-#[derive(Debug)]
-pub struct StructDef {
     pub fields: Namespace<FieldId, FieldDef>,
     pub associated_values: Namespace<ValueId, ValueDef>,
 }
 
-impl StructDef {
-    pub fn new() -> Self {
-        Self {
-            fields: Namespace::new(),
-            associated_values: Namespace::new(),
-        }
+impl TypeDef {
+    pub fn is_builtin(&self) -> bool {
+        matches!(
+            self.name.as_str(),
+            "i32" | "u32" | "isize" | "usize" | "bool" | "Box" | "Vec"
+        )
     }
 }
 

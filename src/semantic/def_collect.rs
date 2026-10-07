@@ -2,10 +2,7 @@ use crate::{
     diagnostic::Diagnostic,
     frontend::ast::{AssociatedItemKind, AstNodeId, Crate, ItemKind, PathIdent, TyAst, TyAstKind},
     semantic::{
-        ctx::{
-            DefId, FieldDef, SemanticCtx, StructDef, TypeDef, TypeDefKind, TypeId, ValueDef,
-            ValueDefKind,
-        },
+        ctx::{DefId, FieldDef, Namespace, SemanticCtx, TypeDef, TypeId, ValueDef, ValueDefKind},
         visitor::{Visitor, walk_item},
     },
 };
@@ -71,7 +68,12 @@ impl<'a> Visitor for DefCollector<'a> {
     fn visit_struct(&mut self, node: &crate::frontend::ast::Struct) {
         let name = &node.name.name;
         let ast_node_id = self.current_item_id.expect("struct must be in an item");
-        let mut structure = StructDef::new();
+        let mut structure = TypeDef {
+            name: name.clone(),
+            ast_node_id: Some(ast_node_id),
+            fields: Namespace::new(),
+            associated_values: Namespace::new(),
+        };
 
         for field in &node.fields {
             let name = &field.name.name;
@@ -92,14 +94,7 @@ impl<'a> Visitor for DefCollector<'a> {
                 ));
             }
         }
-        match self.ctx.define_type(
-            name.clone(),
-            TypeDef {
-                name: name.clone(),
-                ast_node_id: Some(ast_node_id),
-                kind: TypeDefKind::Struct(structure),
-            },
-        ) {
+        match self.ctx.define_type(name.clone(), structure) {
             Ok(id) => {
                 self.ctx.bind(ast_node_id, DefId::Type(id));
             }
@@ -148,19 +143,14 @@ fn collect_impls(ast: &Crate, ctx: &mut SemanticCtx, diagnostics: &mut Vec<Diagn
                 AssociatedItemKind::ConstItem(constant) => (&constant.name, ValueDefKind::Const),
             };
 
-            let result = {
-                let TypeDefKind::Struct(structure) = &mut ctx.get_type_mut(target).kind else {
-                    unreachable!("resolved impl target must be a user struct");
-                };
-                structure.associated_values.define(
-                    name.name.clone(),
-                    ValueDef {
-                        name: name.name.clone(),
-                        ast_node_id: Some(item.id),
-                        kind,
-                    },
-                )
-            };
+            let result = ctx.get_type_mut(target).associated_values.define(
+                name.name.clone(),
+                ValueDef {
+                    name: name.name.clone(),
+                    ast_node_id: Some(item.id),
+                    kind,
+                },
+            );
 
             match result {
                 Ok(id) => {
@@ -213,7 +203,7 @@ fn resolve_impl_target(ty: &TyAst, ctx: &SemanticCtx) -> Result<TypeId, Diagnost
         )
     })?;
 
-    if !matches!(&ctx.get_type(id).kind, TypeDefKind::Struct(_)) {
+    if ctx.get_type(id).is_builtin() {
         return Err(Diagnostic::new(
             "Impl target must be a user struct name",
             ty.span.clone(),

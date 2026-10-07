@@ -2,7 +2,7 @@ use crate::{
     diagnostic::Diagnostic,
     frontend::ast::Crate,
     semantic::{
-        ctx::{SemanticCtx, TypeDef, TypeDefKind, ValueDef, ValueDefKind},
+        ctx::{Namespace, SemanticCtx, TypeDef, ValueDef, ValueDefKind},
         def_collect::def_collect,
         name_res::name_resolve,
     },
@@ -18,7 +18,8 @@ pub fn semantic_check(ast: &Crate) -> Result<SemanticCtx, Vec<Diagnostic>> {
             TypeDef {
                 name: builtin_type.to_string(),
                 ast_node_id: None,
-                kind: TypeDefKind::Builtin,
+                fields: Namespace::new(),
+                associated_values: Namespace::new(),
             },
         )
         .expect("builtin name must not collide");
