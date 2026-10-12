@@ -125,7 +125,7 @@ impl DefTable {
 #[derive(Debug)]
 pub struct TypeDef {
     pub name: String,
-    /// The enclosing item ID for source declarations; `None` for builtins.
+    /// The struct node ID for source declarations; `None` for builtins.
     pub ast_node_id: Option<AstNodeId>,
     pub fields: Namespace<FieldId, FieldDef>,
     pub associated_values: Namespace<ValueId, ValueDef>,
@@ -149,7 +149,7 @@ pub struct FieldDef {
 #[derive(Debug)]
 pub struct ValueDef {
     pub name: String,
-    /// The enclosing item or associated item ID; `None` for builtins.
+    /// The function or constant node ID; `None` for builtins.
     pub ast_node_id: Option<AstNodeId>,
     pub kind: ValueDefKind,
 }

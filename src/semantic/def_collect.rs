@@ -1,40 +1,31 @@
 use crate::{
     diagnostic::Diagnostic,
-    frontend::ast::{AssociatedItemKind, AstNodeId, Crate, ItemKind, PathIdent, TyAst, TyAstKind},
+    frontend::ast::{AssociatedItemKind, Crate, ItemKind, PathIdent, TyAst, TyAstKind},
     semantic::{
         ctx::{DefId, FieldDef, Namespace, SemanticCtx, TypeDef, TypeId, ValueDef, ValueDefKind},
-        visitor::{Visitor, walk_item},
+        visitor::Visitor,
     },
 };
 
 pub struct DefCollector<'a> {
     ctx: &'a mut SemanticCtx,
     diagnostics: &'a mut Vec<Diagnostic>,
-
-    current_item_id: Option<AstNodeId>,
 }
 
 impl<'a> Visitor for DefCollector<'a> {
-    fn visit_item(&mut self, node: &crate::frontend::ast::Item) {
-        self.current_item_id = Some(node.id);
-        walk_item(self, node);
-        self.current_item_id = None;
-    }
-
     fn visit_function(&mut self, node: &crate::frontend::ast::Function) {
         let name = &node.name.name;
-        let ast_node_id = self.current_item_id.expect("function must be in an item");
 
         match self.ctx.define_value(
             name.clone(),
             ValueDef {
                 name: name.clone(),
-                ast_node_id: Some(ast_node_id),
+                ast_node_id: Some(node.id),
                 kind: ValueDefKind::Function,
             },
         ) {
             Ok(id) => {
-                self.ctx.bind(ast_node_id, DefId::GlobalValue(id));
+                self.ctx.bind(node.id, DefId::GlobalValue(id));
             }
             Err(_) => self.diagnostics.push(Diagnostic {
                 message: format!("Duplicate definition of {}", name),
@@ -45,18 +36,17 @@ impl<'a> Visitor for DefCollector<'a> {
 
     fn visit_const_item(&mut self, node: &crate::frontend::ast::ConstItem) {
         let name = &node.name.name;
-        let ast_node_id = self.current_item_id.expect("const item must be in an item");
 
         match self.ctx.define_value(
             name.clone(),
             ValueDef {
                 name: name.clone(),
-                ast_node_id: Some(ast_node_id),
+                ast_node_id: Some(node.id),
                 kind: ValueDefKind::Const,
             },
         ) {
             Ok(id) => {
-                self.ctx.bind(ast_node_id, DefId::GlobalValue(id));
+                self.ctx.bind(node.id, DefId::GlobalValue(id));
             }
             Err(_) => self.diagnostics.push(Diagnostic {
                 message: format!("Duplicate definition of {}", name),
@@ -67,10 +57,9 @@ impl<'a> Visitor for DefCollector<'a> {
 
     fn visit_struct(&mut self, node: &crate::frontend::ast::Struct) {
         let name = &node.name.name;
-        let ast_node_id = self.current_item_id.expect("struct must be in an item");
         let mut structure = TypeDef {
             name: name.clone(),
-            ast_node_id: Some(ast_node_id),
+            ast_node_id: Some(node.id),
             fields: Namespace::new(),
             associated_values: Namespace::new(),
         };
@@ -96,7 +85,7 @@ impl<'a> Visitor for DefCollector<'a> {
         }
         match self.ctx.define_type(name.clone(), structure) {
             Ok(id) => {
-                self.ctx.bind(ast_node_id, DefId::Type(id));
+                self.ctx.bind(node.id, DefId::Type(id));
             }
             Err(_) => self.diagnostics.push(Diagnostic {
                 message: format!("Duplicate definition of {}", name),
@@ -111,12 +100,7 @@ impl<'a> Visitor for DefCollector<'a> {
 }
 
 pub fn def_collect(ast: &Crate, ctx: &mut SemanticCtx, diagnostics: &mut Vec<Diagnostic>) {
-    DefCollector {
-        ctx,
-        diagnostics,
-        current_item_id: None,
-    }
-    .visit_crate(ast);
+    DefCollector { ctx, diagnostics }.visit_crate(ast);
 
     if diagnostics.is_empty() {
         collect_impls(ast, ctx, diagnostics);
@@ -135,19 +119,24 @@ fn collect_impls(ast: &Crate, ctx: &mut SemanticCtx, diagnostics: &mut Vec<Diagn
                 continue;
             }
         };
+        ctx.bind(implementation.id, DefId::Type(target));
         ctx.bind(implementation.ty.id, DefId::Type(target));
 
         for item in &implementation.items {
-            let (name, kind) = match &item.kind {
-                AssociatedItemKind::Function(function) => (&function.name, ValueDefKind::Function),
-                AssociatedItemKind::ConstItem(constant) => (&constant.name, ValueDefKind::Const),
+            let (ast_node_id, name, kind) = match &item.kind {
+                AssociatedItemKind::Function(function) => {
+                    (function.id, &function.name, ValueDefKind::Function)
+                }
+                AssociatedItemKind::ConstItem(constant) => {
+                    (constant.id, &constant.name, ValueDefKind::Const)
+                }
             };
 
             let result = ctx.get_type_mut(target).associated_values.define(
                 name.name.clone(),
                 ValueDef {
                     name: name.name.clone(),
-                    ast_node_id: Some(item.id),
+                    ast_node_id: Some(ast_node_id),
                     kind,
                 },
             );
@@ -155,7 +144,7 @@ fn collect_impls(ast: &Crate, ctx: &mut SemanticCtx, diagnostics: &mut Vec<Diagn
             match result {
                 Ok(id) => {
                     ctx.bind(
-                        item.id,
+                        ast_node_id,
                         DefId::AssociatedValue {
                             owner: target,
                             value: id,

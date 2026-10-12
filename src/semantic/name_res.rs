@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::{
     diagnostic::Diagnostic,
     frontend::ast::{
-        AstNodeId, ConstValueKind, Crate, ExprKind, Path,
+        ConstValueKind, Crate, ExprKind, Path,
         PathIdent::{self, Ident, SelfType, SelfValue},
         PathSegment, TyAstKind,
     },
@@ -13,8 +13,8 @@ use crate::{
             LocalDef, LocalDefKind, LocalId, SemanticCtx, TypeId, ValueDefKind,
         },
         visitor::{
-            Visitor, walk_block, walk_const_value, walk_expr, walk_function, walk_item,
-            walk_let_stmt, walk_struct, walk_ty,
+            Visitor, walk_block, walk_const_value, walk_expr, walk_function, walk_let_stmt,
+            walk_struct, walk_ty,
         },
     },
 };
@@ -25,23 +25,16 @@ struct NameResolution<'a> {
 
     scopes: Vec<HashMap<String, LocalId>>,
 
-    current_item_id: Option<AstNodeId>,
     current_impl_target: Option<TypeId>,
     current_self_ty: Option<TypeId>,
 }
 
 impl<'a> Visitor for NameResolution<'a> {
-    fn visit_item(&mut self, node: &crate::frontend::ast::Item) {
-        self.current_item_id = Some(node.id);
-        walk_item(self, node);
-        self.current_item_id = None;
-    }
-
     fn visit_struct(&mut self, node: &crate::frontend::ast::Struct) {
         let DefId::Type(ty) = self
             .ctx
-            .binding(self.current_item_id.expect("struct is an item"))
-            .expect("struct must be bound in def_colelct")
+            .binding(node.id)
+            .expect("struct must be bound in def_collect")
         else {
             unreachable!("binding of struct must be type");
         };
@@ -52,13 +45,12 @@ impl<'a> Visitor for NameResolution<'a> {
     }
 
     fn visit_impl(&mut self, node: &crate::frontend::ast::Impl) {
-        let target_id = node.ty.id;
         let DefId::Type(target) = self
             .ctx
-            .binding(target_id)
-            .expect("targetid must be bound in def_collect")
+            .binding(node.id)
+            .expect("impl must be bound in def_collect")
         else {
-            unreachable!("binding of impl targt must be type");
+            unreachable!("binding of impl must be type");
         };
 
         self.current_impl_target = Some(target);
@@ -346,7 +338,6 @@ pub fn name_resolve(ast: &Crate, ctx: &mut SemanticCtx, diagnostics: &mut Vec<Di
         diagnostics,
 
         scopes: Vec::new(),
-        current_item_id: None,
         current_impl_target: None,
         current_self_ty: None,
     }

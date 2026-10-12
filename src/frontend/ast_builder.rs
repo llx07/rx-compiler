@@ -108,7 +108,6 @@ impl AstBuilder {
         };
 
         Ok(Some(Item {
-            id: self.ids.alloc(),
             kind: kind,
             span: node_span(node),
         }))
@@ -171,6 +170,7 @@ impl AstBuilder {
         }
 
         Ok(Function {
+            id: self.ids.alloc(),
             name: name.expect("function must have a name"),
             receiver: receiver,
             params: params,
@@ -291,6 +291,7 @@ impl AstBuilder {
         }
 
         Ok(Struct {
+            id: self.ids.alloc(),
             name: name.expect("struct must have a name"),
             derives: derives,
             fields: fields,
@@ -371,6 +372,7 @@ impl AstBuilder {
         }
 
         Ok(ConstItem {
+            id: self.ids.alloc(),
             name: name.expect("constant item must have a name"),
             ty: ty.expect("constant item must have a type"),
             value: value.expect("constant item must have a value"),
@@ -469,6 +471,7 @@ impl AstBuilder {
         }
 
         Ok(Impl {
+            id: self.ids.alloc(),
             ty: ty.expect("impl must have a type"),
             items: items,
             span: node_span(node),
@@ -496,7 +499,6 @@ impl AstBuilder {
         };
 
         Ok(AssociatedItem {
-            id: self.ids.alloc(),
             kind: kind,
             span: node_span(node),
         })

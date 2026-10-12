@@ -16,7 +16,6 @@ pub struct Crate {
 
 #[derive(Debug)]
 pub struct Item {
-    pub id: AstNodeId,
     pub kind: ItemKind,
     pub span: Span,
 }
@@ -37,6 +36,7 @@ pub enum ItemKind {
 
 #[derive(Debug)]
 pub struct Function {
+    pub id: AstNodeId,
     pub name: Ident,
     pub receiver: Option<Receiver>,
     pub params: Vec<Param>,
@@ -71,6 +71,7 @@ pub struct Binding {
 
 #[derive(Debug)]
 pub struct Struct {
+    pub id: AstNodeId,
     pub name: Ident,
     pub derives: Vec<Derive>,
     pub fields: Vec<StructField>,
@@ -101,6 +102,7 @@ pub struct StructField {
 
 #[derive(Debug)]
 pub struct ConstItem {
+    pub id: AstNodeId,
     pub name: Ident,
     pub ty: TyAst,
     pub value: ConstValue,
@@ -139,6 +141,7 @@ pub enum IntSuffix {
 
 #[derive(Debug)]
 pub struct Impl {
+    pub id: AstNodeId,
     pub ty: TyAst,
     pub items: Vec<AssociatedItem>,
     pub span: Span,
@@ -146,7 +149,6 @@ pub struct Impl {
 
 #[derive(Debug)]
 pub struct AssociatedItem {
-    pub id: AstNodeId,
     pub kind: AssociatedItemKind,
     pub span: Span,
 }
