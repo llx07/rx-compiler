@@ -2,16 +2,9 @@ use std::collections::HashMap;
 
 use crate::{
     diagnostic::Diagnostic,
-    frontend::ast::{
-        ConstValueKind, Crate, ExprKind, Path,
-        PathIdent::{self, Ident, SelfType, SelfValue},
-        PathSegment, TyAstKind,
-    },
+    frontend::ast::{ConstValueKind, Crate, ExprKind, Path, PathIdent, PathSegment, TyAstKind},
     semantic::{
-        ctx::{
-            DefId::{self, Type},
-            LocalDef, LocalDefKind, LocalId, SemanticCtx, TypeId, ValueDefKind,
-        },
+        ctx::{DefId, LocalDef, LocalDefKind, LocalId, SemanticCtx, TypeId, ValueDefKind},
         visitor::{
             Visitor, walk_block, walk_const_value, walk_expr, walk_function, walk_let_stmt,
             walk_struct, walk_ty,
@@ -229,7 +222,7 @@ impl<'a> NameResolution<'a> {
             )),
             PathIdent::SelfType => {
                 if let Some(ty) = self.current_self_ty {
-                    Ok(Type(ty))
+                    Ok(DefId::Type(ty))
                 } else {
                     Err(Diagnostic::new(
                         "Using Self outside impl or struct",
@@ -239,7 +232,7 @@ impl<'a> NameResolution<'a> {
             }
             PathIdent::Ident(ident) => {
                 if let Some(ty) = self.ctx.lookup_type(&ident.name) {
-                    Ok(Type(ty))
+                    Ok(DefId::Type(ty))
                 } else {
                     Err(Diagnostic::new("Unknown type name", segment.span.clone()))
                 }
@@ -267,9 +260,9 @@ impl<'a> NameResolution<'a> {
         path_seg: &PathSegment,
     ) -> Result<Option<DefId>, Diagnostic> {
         let name = match &path_seg.name {
-            Ident(ident) => &ident.name,
-            SelfValue => &"self".to_string(),
-            SelfType => {
+            PathIdent::Ident(ident) => &ident.name,
+            PathIdent::SelfValue => &"self".to_string(),
+            PathIdent::SelfType => {
                 return Err(Diagnostic::new(
                     "Self is not a valid value",
                     path_seg.span.clone(),
@@ -302,13 +295,13 @@ impl<'a> NameResolution<'a> {
         ty_seg: &PathSegment,
         mem_seg: &PathSegment,
     ) -> Result<Option<DefId>, Diagnostic> {
-        let Type(ty) = self.resolve_type_segment(ty_seg)? else {
+        let DefId::Type(ty) = self.resolve_type_segment(ty_seg)? else {
             unreachable!("must be type");
         };
 
         let ty_def = self.ctx.get_type(ty);
         let name = match &mem_seg.name {
-            Ident(ident) => ident.name.as_str(),
+            PathIdent::Ident(ident) => ident.name.as_str(),
             _ => {
                 return Err(Diagnostic::new(
                     "not a valid name of associated item",
