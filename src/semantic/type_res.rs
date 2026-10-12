@@ -4,14 +4,14 @@ use crate::{
     diagnostic::Diagnostic,
     frontend::ast::{
         AssociatedItemKind, AstNodeId, ConstItem, ConstValue, ConstValueKind, Crate, IntSuffix,
-        ItemKind, Struct, TyAstKind,
+        ItemKind, Path, PathIdent, Struct, TyAstKind,
     },
     semantic::{
         ctx::{
             BuiltinType, DefId, SemanticCtx, Ty, TypeDef, TypeId, TypedConst, TypedConstKind,
             ValueDefKind,
         },
-        visitor::{Visitor, walk_struct_field},
+        visitor::{Visitor, walk_path, walk_struct_field},
     },
 };
 
@@ -55,6 +55,13 @@ fn inline_struct_type(ty: &Ty) -> Option<TypeId> {
 }
 
 impl Visitor for TypeResolver<'_> {
+    fn visit_path(&mut self, node: &Path) {
+        if let Err(diag) = self.check_expression_path_args(node) {
+            self.diagnostics.push(diag);
+        }
+        walk_path(self, node);
+    }
+
     fn visit_struct_field(&mut self, node: &crate::frontend::ast::StructField) {
         walk_struct_field(self, node);
         if let Some(ty) = self.ctx.get_ast_type(node.ty.id) {
@@ -116,6 +123,51 @@ impl<'a> TypeResolver<'a> {
             resolving_consts: HashSet::new(),
             resolving_structs: HashMap::new(),
         }
+    }
+
+    fn check_expression_path_args(&self, path: &Path) -> Result<(), Diagnostic> {
+        let (first, member) = match path.segments.as_slice() {
+            [value] => {
+                if !value.generic_args.is_empty() {
+                    return Err(Diagnostic::new(
+                        "value does not accept type arguments",
+                        value.span.clone(),
+                    ));
+                }
+                return Ok(());
+            }
+            [first, member] => (first, member),
+            _ => return Ok(()), // Name resolution reports invalid path lengths.
+        };
+
+        if !member.generic_args.is_empty() {
+            return Err(Diagnostic::new(
+                "associated item does not accept type arguments",
+                member.span.clone(),
+            ));
+        }
+
+        let expected_args: Option<usize> = match &first.name {
+            PathIdent::Ident(name) => {
+                self.ctx
+                    .lookup_type_def(&name.name)
+                    .map(|id| match self.ctx.get_type_def(id) {
+                        TypeDef::Builtin { kind, .. } => kind.type_arg_count(),
+                        TypeDef::Struct { .. } => 0,
+                    })
+            }
+            PathIdent::SelfType => Some(0),
+            PathIdent::SelfValue => None,
+        };
+        if let Some(expected_args) = expected_args {
+            if first.generic_args.len() != expected_args {
+                return Err(Diagnostic::new(
+                    format!("Type requires {expected_args} type argument(s)"),
+                    first.span.clone(),
+                ));
+            }
+        }
+        Ok(())
     }
 
     fn resolve_ty(&mut self, node: &crate::frontend::ast::TyAst) -> Result<Ty, Diagnostic> {
@@ -190,7 +242,7 @@ impl<'a> TypeResolver<'a> {
         node: &crate::frontend::ast::ConstValue,
         expected: &TypedConstKind,
     ) -> Result<TypedConst, Diagnostic> {
-        match &node.kind {
+        let resolved = match &node.kind {
             ConstValueKind::Int(literal) => {
                 if matches!(expected, TypedConstKind::Bool) {
                     return Err(Diagnostic::new(
@@ -255,6 +307,7 @@ impl<'a> TypeResolver<'a> {
                 })
             }
             ConstValueKind::Path(path) => {
+                self.check_expression_path_args(path)?;
                 // Name resolution binds the ConstValue node, not its nested Path node.
                 let def = self.ctx.node_def(node.id).ok_or_else(|| {
                     Diagnostic::new("unresolved constant path", path.span.clone())
@@ -291,10 +344,11 @@ impl<'a> TypeResolver<'a> {
                         path.span.clone(),
                     ));
                 }
-                self.ctx.record_const_value(node.id, resolved);
                 Ok(resolved)
             }
-        }
+        }?;
+        self.ctx.record_const_value(node.id, resolved);
+        Ok(resolved)
     }
 
     pub fn resolve_const_item(&mut self, item: &ConstItem) -> Result<TypedConst, Diagnostic> {
