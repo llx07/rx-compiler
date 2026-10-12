@@ -26,7 +26,7 @@ impl<'a> Visitor for NameResolution<'a> {
     fn visit_struct(&mut self, node: &crate::frontend::ast::Struct) {
         let DefId::Type(ty) = self
             .ctx
-            .binding(node.id)
+            .node_def(node.id)
             .expect("struct must be bound in def_collect")
         else {
             unreachable!("binding of struct must be type");
@@ -40,7 +40,7 @@ impl<'a> Visitor for NameResolution<'a> {
     fn visit_impl(&mut self, node: &crate::frontend::ast::Impl) {
         let DefId::Type(target) = self
             .ctx
-            .binding(node.id)
+            .node_def(node.id)
             .expect("impl must be bound in def_collect")
         else {
             unreachable!("binding of impl must be type");
@@ -67,7 +67,7 @@ impl<'a> Visitor for NameResolution<'a> {
                     kind: LocalDefKind::Receiver { ty: target },
                 });
 
-                self.ctx.bind(receiver.id, DefId::Local(self_id));
+                self.ctx.record_node_def(receiver.id, DefId::Local(self_id));
                 self.scopes
                     .last_mut()
                     .unwrap()
@@ -96,7 +96,7 @@ impl<'a> Visitor for NameResolution<'a> {
                 is_mut: param.binding.is_mut,
                 kind: super::ctx::LocalDefKind::Param,
             });
-            self.ctx.bind(param.id, DefId::Local(param_id));
+            self.ctx.record_node_def(param.id, DefId::Local(param_id));
 
             self.scopes
                 .last_mut()
@@ -122,7 +122,7 @@ impl<'a> Visitor for NameResolution<'a> {
             is_mut: node.binding.is_mut,
             kind: super::ctx::LocalDefKind::Let,
         });
-        self.ctx.bind(node.id, DefId::Local(let_id));
+        self.ctx.record_node_def(node.id, DefId::Local(let_id));
 
         self.scopes
             .last_mut()
@@ -160,7 +160,7 @@ impl<'a> Visitor for NameResolution<'a> {
                 return;
             }
 
-            self.ctx.bind(node.id, def_id);
+            self.ctx.record_node_def(node.id, def_id);
         }
         walk_const_value(self, node);
     }
@@ -170,7 +170,7 @@ impl<'a> Visitor for NameResolution<'a> {
             match self.resolve_expr_path(path) {
                 Ok(id) => {
                     if let Some(id) = id {
-                        self.ctx.bind(node.id, id);
+                        self.ctx.record_node_def(node.id, id);
                     }
                 }
                 Err(diag) => {
@@ -181,7 +181,7 @@ impl<'a> Visitor for NameResolution<'a> {
         if let ExprKind::Struct(structure) = &node.kind {
             match self.resolve_type_path(&structure.path) {
                 Ok(id) => {
-                    self.ctx.bind(structure.path.id, id);
+                    self.ctx.record_node_def(structure.path.id, id);
                 }
                 Err(diag) => {
                     self.diagnostics.push(diag);
@@ -195,7 +195,7 @@ impl<'a> Visitor for NameResolution<'a> {
         if let TyAstKind::Path(path) = &node.kind {
             match self.resolve_type_path(path) {
                 Ok(id) => {
-                    self.ctx.bind(node.id, id);
+                    self.ctx.record_node_def(node.id, id);
                 }
                 Err(diag) => {
                     self.diagnostics.push(diag);

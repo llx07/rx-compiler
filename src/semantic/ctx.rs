@@ -293,7 +293,7 @@ pub enum TypedConst {
 pub struct SemanticCtx {
     defs: DefTable,
     locals: LocalTable,
-    bindings: HashMap<AstNodeId, DefId>,
+    node_defs: HashMap<AstNodeId, DefId>,
 
     ast_types: HashMap<AstNodeId, Ty>,
     const_values: HashMap<AstNodeId, TypedConst>,
@@ -304,7 +304,7 @@ impl SemanticCtx {
         Self {
             defs: DefTable::new(),
             locals: LocalTable::new(),
-            bindings: HashMap::new(),
+            node_defs: HashMap::new(),
             ast_types: HashMap::new(),
             const_values: HashMap::new(),
         }
@@ -338,13 +338,14 @@ impl SemanticCtx {
         self.defs.types.get_mut(id)
     }
 
-    pub fn bind(&mut self, node: AstNodeId, def: DefId) {
-        let old = self.bindings.insert(node, def);
+    /// Records the definition ID associated with an AST node.
+    pub fn record_node_def(&mut self, node: AstNodeId, def: DefId) {
+        let old = self.node_defs.insert(node, def);
         debug_assert!(old.is_none());
     }
 
-    pub fn binding(&self, node: AstNodeId) -> Option<DefId> {
-        self.bindings.get(&node).copied()
+    pub fn node_def(&self, node: AstNodeId) -> Option<DefId> {
+        self.node_defs.get(&node).copied()
     }
 
     pub fn alloc_local(&mut self, def: LocalDef) -> LocalId {

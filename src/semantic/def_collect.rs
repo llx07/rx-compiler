@@ -25,7 +25,7 @@ impl<'a> Visitor for DefCollector<'a> {
             },
         ) {
             Ok(id) => {
-                self.ctx.bind(node.id, DefId::GlobalValue(id));
+                self.ctx.record_node_def(node.id, DefId::GlobalValue(id));
             }
             Err(_) => self.diagnostics.push(Diagnostic {
                 message: format!("Duplicate definition of {}", name),
@@ -46,7 +46,7 @@ impl<'a> Visitor for DefCollector<'a> {
             },
         ) {
             Ok(id) => {
-                self.ctx.bind(node.id, DefId::GlobalValue(id));
+                self.ctx.record_node_def(node.id, DefId::GlobalValue(id));
             }
             Err(_) => self.diagnostics.push(Diagnostic {
                 message: format!("Duplicate definition of {}", name),
@@ -85,7 +85,7 @@ impl<'a> Visitor for DefCollector<'a> {
         };
         match self.ctx.define_type(name.clone(), structure) {
             Ok(id) => {
-                self.ctx.bind(node.id, DefId::Type(id));
+                self.ctx.record_node_def(node.id, DefId::Type(id));
             }
             Err(_) => self.diagnostics.push(Diagnostic {
                 message: format!("Duplicate definition of {}", name),
@@ -119,8 +119,8 @@ fn collect_impls(ast: &Crate, ctx: &mut SemanticCtx, diagnostics: &mut Vec<Diagn
                 continue;
             }
         };
-        ctx.bind(implementation.id, DefId::Type(target));
-        ctx.bind(implementation.ty.id, DefId::Type(target));
+        ctx.record_node_def(implementation.id, DefId::Type(target));
+        ctx.record_node_def(implementation.ty.id, DefId::Type(target));
 
         for item in &implementation.items {
             let (ast_node_id, name, kind) = match &item.kind {
@@ -143,7 +143,7 @@ fn collect_impls(ast: &Crate, ctx: &mut SemanticCtx, diagnostics: &mut Vec<Diagn
 
             match result {
                 Ok(id) => {
-                    ctx.bind(
+                    ctx.record_node_def(
                         ast_node_id,
                         DefId::AssociatedValue {
                             owner: target,

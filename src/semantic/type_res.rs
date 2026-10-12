@@ -58,7 +58,7 @@ impl TypeResolver<'_> {
                 };
                 let DefId::Type(type_id) = self
                     .ctx
-                    .binding(node.id)
+                    .node_def(node.id)
                     .ok_or_else(|| Diagnostic::new("Unknown type", path.span.clone()))?
                 else {
                     return Err(Diagnostic::new("Unknown type", path.span.clone()));
