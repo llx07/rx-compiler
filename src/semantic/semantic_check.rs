@@ -5,6 +5,7 @@ use crate::{
         ctx::{BuiltinType, Namespace, SemanticCtx, TypeDef, ValueDef, ValueDefKind},
         def_collect::def_collect,
         name_res::name_resolve,
+        type_res::type_resolve,
     },
 };
 
@@ -60,6 +61,11 @@ pub fn semantic_check(ast: &Crate) -> Result<SemanticCtx, Vec<Diagnostic>> {
     }
 
     name_resolve(ast, &mut ctx, &mut diagnostics);
+
+    if !diagnostics.is_empty() {
+        return Err(diagnostics);
+    }
+    type_resolve(ast, &mut ctx, &mut diagnostics);
 
     if !diagnostics.is_empty() {
         return Err(diagnostics);

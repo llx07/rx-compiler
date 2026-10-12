@@ -1,37 +1,123 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::{
     diagnostic::Diagnostic,
-    frontend::ast::TyAstKind,
+    frontend::ast::{
+        AssociatedItemKind, AstNodeId, ConstItem, ConstValue, ConstValueKind, Crate, IntSuffix,
+        ItemKind, Struct, TyAstKind,
+    },
     semantic::{
-        ctx::{BuiltinType, DefId, SemanticCtx, Ty, TypeDef, TypedConst},
-        visitor::Visitor,
+        ctx::{
+            BuiltinType, DefId, SemanticCtx, Ty, TypeDef, TypeId, TypedConst, TypedConstKind,
+            ValueDefKind,
+        },
+        visitor::{Visitor, walk_struct_field},
     },
 };
-
-#[derive(Debug, PartialEq, Eq)]
-enum ConstState {
-    Visiting,
-    Done(TypedConst),
-    Failed,
-}
 
 pub struct TypeResolver<'a> {
     ctx: &'a mut SemanticCtx,
     diagnostics: &'a mut Vec<Diagnostic>,
 
-    const_states: HashMap<DefId, ConstState>,
+    const_items: HashMap<AstNodeId, &'a ConstItem>,
+    struct_items: HashMap<AstNodeId, &'a Struct>,
+
+    resolving_consts: HashSet<AstNodeId>,
+    resolving_structs: HashMap<AstNodeId, VisitState>,
+}
+
+enum VisitState {
+    Visiting,
+    Done,
+}
+
+fn parse_int_literal(raw: &str) -> Option<i64> {
+    let (radix, digits) = if let Some(digits) = raw.strip_prefix("0b") {
+        (2, digits)
+    } else if let Some(digits) = raw.strip_prefix("0o") {
+        (8, digits)
+    } else if let Some(digits) = raw.strip_prefix("0x") {
+        (16, digits)
+    } else {
+        (10, raw)
+    };
+
+    let digits: String = digits.chars().filter(|&c| c != '_').collect();
+    i64::from_str_radix(&digits, radix).ok()
+}
+
+fn inline_struct_type(ty: &Ty) -> Option<TypeId> {
+    match ty {
+        Ty::Struct(id) => Some(*id),
+        Ty::Array { elem, .. } => inline_struct_type(elem),
+        _ => None,
+    }
 }
 
 impl Visitor for TypeResolver<'_> {
+    fn visit_struct_field(&mut self, node: &crate::frontend::ast::StructField) {
+        walk_struct_field(self, node);
+        if let Some(ty) = self.ctx.get_ast_type(node.ty.id) {
+            self.ctx.record_type(node.id, ty.clone());
+        }
+    }
+
     fn visit_ty(&mut self, node: &crate::frontend::ast::TyAst) {
         if let Err(diag) = self.resolve_ty(node) {
             self.diagnostics.push(diag);
         }
     }
+
+    fn visit_const_item(&mut self, node: &ConstItem) {
+        if let Err(diag) = self.resolve_const_item(node) {
+            self.diagnostics.push(diag);
+        }
+    }
+
+    fn visit_const_value(&mut self, node: &ConstValue) {
+        if let Err(diag) = self.resolve_const_value(node, &TypedConstKind::Usize) {
+            self.diagnostics.push(diag);
+        }
+    }
 }
 
-impl TypeResolver<'_> {
+impl<'a> TypeResolver<'a> {
+    pub fn new(
+        ast: &'a Crate,
+        ctx: &'a mut SemanticCtx,
+        diagnostics: &'a mut Vec<Diagnostic>,
+    ) -> Self {
+        let mut const_items = HashMap::new();
+        let mut struct_items = HashMap::new();
+        for item in &ast.items {
+            match &item.kind {
+                ItemKind::Const(constant) => {
+                    const_items.insert(constant.id, constant);
+                }
+                ItemKind::Impl(implementation) => {
+                    for item in &implementation.items {
+                        if let AssociatedItemKind::ConstItem(constant) = &item.kind {
+                            const_items.insert(constant.id, constant);
+                        }
+                    }
+                }
+                ItemKind::Struct(structure) => {
+                    struct_items.insert(structure.id, structure);
+                }
+                _ => {}
+            }
+        }
+
+        Self {
+            ctx,
+            diagnostics,
+            const_items,
+            struct_items,
+            resolving_consts: HashSet::new(),
+            resolving_structs: HashMap::new(),
+        }
+    }
+
     fn resolve_ty(&mut self, node: &crate::frontend::ast::TyAst) -> Result<Ty, Diagnostic> {
         let ty = match &node.kind {
             TyAstKind::Unit => Ty::Unit,
@@ -44,9 +130,9 @@ impl TypeResolver<'_> {
             }
             TyAstKind::Array(array) => {
                 let elem = self.resolve_ty(&array.ty)?;
-                let TypedConst::Usize(len) = self.resolve_const(&array.len, &Ty::USize)? else {
-                    unreachable!()
-                };
+                let len = self
+                    .resolve_const_value(&array.len, &TypedConstKind::Usize)?
+                    .value as usize;
                 Ty::Array {
                     elem: Box::new(elem),
                     len,
@@ -64,7 +150,7 @@ impl TypeResolver<'_> {
                     return Err(Diagnostic::new("Unknown type", path.span.clone()));
                 };
 
-                let builtin = match self.ctx.get_type(type_id) {
+                let builtin = match self.ctx.get_type_def(type_id) {
                     TypeDef::Builtin { kind, .. } => Some(*kind),
                     TypeDef::Struct { .. } => None,
                 };
@@ -95,18 +181,214 @@ impl TypeResolver<'_> {
                 }
             }
         };
+        self.ctx.record_type(node.id, ty.clone());
         Ok(ty)
     }
 
-    fn resolve_const(
+    fn resolve_const_value(
         &mut self,
         node: &crate::frontend::ast::ConstValue,
-        expected: &Ty,
+        expected: &TypedConstKind,
     ) -> Result<TypedConst, Diagnostic> {
-        todo!()
+        match &node.kind {
+            ConstValueKind::Int(literal) => {
+                if matches!(expected, TypedConstKind::Bool) {
+                    return Err(Diagnostic::new(
+                        "expected a constant bool, got an integer",
+                        node.span.clone(),
+                    ));
+                }
+
+                let expected_suffix = match expected {
+                    TypedConstKind::I32 => IntSuffix::I32,
+                    TypedConstKind::U32 => IntSuffix::U32,
+                    TypedConstKind::Isize => IntSuffix::ISize,
+                    TypedConstKind::Usize => IntSuffix::USize,
+                    TypedConstKind::Bool => unreachable!(),
+                };
+
+                if literal
+                    .suffix
+                    .as_ref()
+                    .is_some_and(|suffix| *suffix != expected_suffix)
+                {
+                    return Err(Diagnostic::new(
+                        "type mismatch for integer constant",
+                        node.span.clone(),
+                    ));
+                }
+
+                let value = parse_int_literal(&literal.raw).ok_or_else(|| {
+                    Diagnostic::new(
+                        "integer literal is invalid or out of range for i64",
+                        node.span.clone(),
+                    )
+                })?;
+
+                Ok(TypedConst {
+                    kind: *expected,
+                    value,
+                })
+            }
+            ConstValueKind::Bool(value) => {
+                if !matches!(expected, TypedConstKind::Bool) {
+                    return Err(Diagnostic::new(
+                        "expected an integer constant, got a bool",
+                        node.span.clone(),
+                    ));
+                }
+                Ok(TypedConst {
+                    kind: TypedConstKind::Bool,
+                    value: i64::from(*value),
+                })
+            }
+            ConstValueKind::Neg(inner) => {
+                if !matches!(expected, TypedConstKind::I32 | TypedConstKind::Isize) {
+                    return Err(Diagnostic::new(
+                        "negation requires a signed integer constant",
+                        node.span.clone(),
+                    ));
+                }
+                Ok(TypedConst {
+                    kind: *expected,
+                    value: -self.resolve_const_value(inner, expected)?.value,
+                })
+            }
+            ConstValueKind::Path(path) => {
+                // Name resolution binds the ConstValue node, not its nested Path node.
+                let def = self.ctx.node_def(node.id).ok_or_else(|| {
+                    Diagnostic::new("unresolved constant path", path.span.clone())
+                })?;
+
+                let value_def = match def {
+                    DefId::AssociatedValue { owner, value } => {
+                        self.ctx.get_type_def(owner).associated_values().get(value)
+                    }
+                    DefId::GlobalValue(value) => self.ctx.get_value_def(value),
+                    _ => {
+                        return Err(Diagnostic::new(
+                            "path must be a constant",
+                            path.span.clone(),
+                        ));
+                    }
+                };
+                if value_def.kind != ValueDefKind::Const {
+                    return Err(Diagnostic::new(
+                        "path must be a constant",
+                        path.span.clone(),
+                    ));
+                }
+                let ast_node_id = value_def.ast_node_id.ok_or_else(|| {
+                    Diagnostic::new("constant has no AST node", path.span.clone())
+                })?;
+                let item = *self.const_items.get(&ast_node_id).ok_or_else(|| {
+                    Diagnostic::new("constant AST node not found", path.span.clone())
+                })?;
+                let resolved = self.resolve_const_item(item)?;
+                if resolved.kind != *expected {
+                    return Err(Diagnostic::new(
+                        "type mismatch for constant path",
+                        path.span.clone(),
+                    ));
+                }
+                self.ctx.record_const_value(node.id, resolved);
+                Ok(resolved)
+            }
+        }
+    }
+
+    pub fn resolve_const_item(&mut self, item: &ConstItem) -> Result<TypedConst, Diagnostic> {
+        if let Some(value) = self.ctx.const_value(item.id) {
+            return Ok(value);
+        }
+        if !self.resolving_consts.insert(item.id) {
+            return Err(Diagnostic::new(
+                "cyclic constant dependency",
+                item.span.clone(),
+            ));
+        }
+
+        let result = (|| {
+            let kind = match self.resolve_ty(&item.ty)? {
+                Ty::I32 => TypedConstKind::I32,
+                Ty::U32 => TypedConstKind::U32,
+                Ty::ISize => TypedConstKind::Isize,
+                Ty::USize => TypedConstKind::Usize,
+                Ty::Bool => TypedConstKind::Bool,
+                _ => {
+                    return Err(Diagnostic::new(
+                        "constant type must be an integer or bool",
+                        item.ty.span.clone(),
+                    ));
+                }
+            };
+            self.resolve_const_value(&item.value, &kind)
+        })();
+
+        self.resolving_consts.remove(&item.id);
+        if let Ok(value) = result {
+            self.ctx.record_const_value(item.id, value);
+        }
+        result
+    }
+
+    fn check_recursive_structs_impl(&mut self, ast_node_id: AstNodeId) {
+        if self
+            .resolving_structs
+            .get(&ast_node_id)
+            .is_some_and(|x| matches!(x, VisitState::Done))
+        {
+            return;
+        }
+        if self
+            .resolving_structs
+            .get(&ast_node_id)
+            .is_some_and(|x| matches!(x, VisitState::Visiting))
+        {
+            self.diagnostics.push(Diagnostic::new(
+                "recursive struct definition",
+                self.struct_items[&ast_node_id].span.clone(),
+            ));
+            return;
+        }
+        self.resolving_structs
+            .insert(ast_node_id, VisitState::Visiting);
+
+        let targets: Vec<_> = self.struct_items[&ast_node_id]
+            .fields
+            .iter()
+            .filter_map(|field| {
+                let ty = self.ctx.get_ast_type(field.id).expect("field is resolved");
+                let type_id = inline_struct_type(ty)?;
+                let TypeDef::Struct { ast_node_id, .. } = self.ctx.get_type_def(type_id) else {
+                    unreachable!("field target must be a struct");
+                };
+                Some(*ast_node_id)
+            })
+            .collect();
+
+        for target in targets {
+            self.check_recursive_structs_impl(target);
+        }
+
+        self.resolving_structs.insert(ast_node_id, VisitState::Done);
     }
 
     fn check_recursive_structs(&mut self) {
-        todo!()
+        let ids: Vec<_> = self.struct_items.keys().copied().collect();
+        for id in ids {
+            self.check_recursive_structs_impl(id);
+        }
     }
+}
+
+pub fn type_resolve(ast: &Crate, ctx: &mut SemanticCtx, diagnostics: &mut Vec<Diagnostic>) {
+    let mut type_res = TypeResolver::new(ast, ctx, diagnostics);
+    type_res.visit_crate(ast);
+
+    if !type_res.diagnostics.is_empty() {
+        return;
+    }
+
+    type_res.check_recursive_structs();
 }

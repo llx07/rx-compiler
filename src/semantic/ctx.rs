@@ -32,6 +32,13 @@ where
         &mut self.definitions[id.into() as usize]
     }
 
+    pub fn iter(&self) -> impl Iterator<Item = (I, &D)> {
+        self.definitions
+            .iter()
+            .enumerate()
+            .map(|(index, def)| (I::from(index as u32), def))
+    }
+
     /// Defines a name, returning its new ID or the existing ID on a duplicate.
     pub fn define(&mut self, name: String, def: D) -> Result<I, I> {
         match self.names.entry(name) {
@@ -266,7 +273,7 @@ pub enum LocalDefKind {
     Let,
     Receiver { ty: TypeId },
 }
-
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Ty {
     I32,
     U32,
@@ -277,17 +284,24 @@ pub enum Ty {
     Never,
     Struct(TypeId),
     Ref { is_mut: bool, inner: Box<Ty> },
-    Array { elem: Box<Ty>, len: u32 },
+    Array { elem: Box<Ty>, len: usize },
     Box(Box<Ty>),
     Vec(Box<Ty>),
 }
 
-#[derive(Debug, PartialEq, Eq)]
-pub enum TypedConst {
-    U32(u32),
-    I32(i32),
-    Usize(u32),
-    Isize(i32),
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TypedConst {
+    pub kind: TypedConstKind,
+    pub value: i64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TypedConstKind {
+    U32,
+    I32,
+    Usize,
+    Isize,
+    Bool,
 }
 
 pub struct SemanticCtx {
@@ -318,23 +332,23 @@ impl SemanticCtx {
         self.defs.values.define(name, def)
     }
 
-    pub fn lookup_type(&self, name: &str) -> Option<TypeId> {
+    pub fn lookup_type_def(&self, name: &str) -> Option<TypeId> {
         self.defs.types.lookup(name)
     }
 
-    pub fn lookup_value(&self, name: &str) -> Option<ValueId> {
+    pub fn lookup_value_def(&self, name: &str) -> Option<ValueId> {
         self.defs.values.lookup(name)
     }
 
-    pub fn get_value(&self, id: ValueId) -> &ValueDef {
+    pub fn get_value_def(&self, id: ValueId) -> &ValueDef {
         self.defs.values.get(id)
     }
 
-    pub fn get_type(&self, id: TypeId) -> &TypeDef {
+    pub fn get_type_def(&self, id: TypeId) -> &TypeDef {
         self.defs.types.get(id)
     }
 
-    pub fn get_type_mut(&mut self, id: TypeId) -> &mut TypeDef {
+    pub fn get_type_def_mut(&mut self, id: TypeId) -> &mut TypeDef {
         self.defs.types.get_mut(id)
     }
 
@@ -354,5 +368,21 @@ impl SemanticCtx {
 
     pub fn get_local(&self, id: LocalId) -> &LocalDef {
         self.locals.get(id)
+    }
+
+    pub fn const_value(&self, node: AstNodeId) -> Option<TypedConst> {
+        self.const_values.get(&node).copied()
+    }
+
+    pub fn record_const_value(&mut self, node: AstNodeId, value: TypedConst) {
+        self.const_values.insert(node, value);
+    }
+
+    pub fn get_ast_type(&self, node: AstNodeId) -> Option<&Ty> {
+        self.ast_types.get(&node)
+    }
+
+    pub fn record_type(&mut self, node: AstNodeId, value: Ty) {
+        self.ast_types.insert(node, value);
     }
 }

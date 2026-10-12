@@ -132,7 +132,7 @@ fn collect_impls(ast: &Crate, ctx: &mut SemanticCtx, diagnostics: &mut Vec<Diagn
                 }
             };
 
-            let result = ctx.get_type_mut(target).associated_values_mut().define(
+            let result = ctx.get_type_def_mut(target).associated_values_mut().define(
                 name.name.clone(),
                 ValueDef {
                     name: name.name.clone(),
@@ -185,14 +185,14 @@ fn resolve_impl_target(ty: &TyAst, ctx: &SemanticCtx) -> Result<TypeId, Diagnost
         ));
     }
 
-    let id = ctx.lookup_type(&name.name).ok_or_else(|| {
+    let id = ctx.lookup_type_def(&name.name).ok_or_else(|| {
         Diagnostic::new(
             format!("Unknown impl target {}", name.name),
             name.span.clone(),
         )
     })?;
 
-    match ctx.get_type(id) {
+    match ctx.get_type_def(id) {
         TypeDef::Struct { .. } => Ok(id),
         TypeDef::Builtin { .. } => Err(Diagnostic::new(
             "Impl target must be a user struct name",

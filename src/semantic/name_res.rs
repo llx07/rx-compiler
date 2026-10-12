@@ -146,9 +146,9 @@ impl<'a> Visitor for NameResolution<'a> {
             };
 
             let is_const = match def_id {
-                DefId::GlobalValue(id) => self.ctx.get_value(id).kind == ValueDefKind::Const,
+                DefId::GlobalValue(id) => self.ctx.get_value_def(id).kind == ValueDefKind::Const,
                 DefId::AssociatedValue { owner, value } => {
-                    self.ctx.get_type(owner).associated_values().get(value).kind
+                    self.ctx.get_type_def(owner).associated_values().get(value).kind
                         == ValueDefKind::Const
                 }
                 _ => false,
@@ -231,7 +231,7 @@ impl<'a> NameResolution<'a> {
                 }
             }
             PathIdent::Ident(ident) => {
-                if let Some(ty) = self.ctx.lookup_type(&ident.name) {
+                if let Some(ty) = self.ctx.lookup_type_def(&ident.name) {
                     Ok(DefId::Type(ty))
                 } else {
                     Err(Diagnostic::new("Unknown type name", segment.span.clone()))
@@ -281,7 +281,7 @@ impl<'a> NameResolution<'a> {
             Ok(Some(DefId::Local(*found.expect("found is some"))))
         } else {
             // lookup in global namespace
-            let global_result = self.ctx.lookup_value(name);
+            let global_result = self.ctx.lookup_value_def(name);
             if let Some(found) = global_result {
                 Ok(Some(DefId::GlobalValue(found)))
             } else {
@@ -299,7 +299,7 @@ impl<'a> NameResolution<'a> {
             unreachable!("must be type");
         };
 
-        let ty_def = self.ctx.get_type(ty);
+        let ty_def = self.ctx.get_type_def(ty);
         let name = match &mem_seg.name {
             PathIdent::Ident(ident) => ident.name.as_str(),
             _ => {

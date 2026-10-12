@@ -131,7 +131,7 @@ pub struct IntLiteral {
     pub suffix: Option<IntSuffix>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum IntSuffix {
     I32,
     U32,
