@@ -49,6 +49,48 @@ where
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BuiltinType {
+    I32,
+    U32,
+    ISize,
+    USize,
+    Bool,
+    Box,
+    Vec,
+}
+
+impl BuiltinType {
+    pub const ALL: [Self; 7] = [
+        Self::I32,
+        Self::U32,
+        Self::ISize,
+        Self::USize,
+        Self::Bool,
+        Self::Box,
+        Self::Vec,
+    ];
+
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::I32 => "i32",
+            Self::U32 => "u32",
+            Self::ISize => "isize",
+            Self::USize => "usize",
+            Self::Bool => "bool",
+            Self::Box => "Box",
+            Self::Vec => "Vec",
+        }
+    }
+
+    pub fn type_arg_count(self) -> usize {
+        match self {
+            Self::I32 | Self::U32 | Self::ISize | Self::USize | Self::Bool => 0,
+            Self::Box | Self::Vec => 1,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TypeId(u32);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -123,20 +165,40 @@ impl DefTable {
 }
 
 #[derive(Debug)]
-pub struct TypeDef {
-    pub name: String,
-    /// The struct node ID for source declarations; `None` for builtins.
-    pub ast_node_id: Option<AstNodeId>,
-    pub fields: Namespace<FieldId, FieldDef>,
-    pub associated_values: Namespace<ValueId, ValueDef>,
+pub enum TypeDef {
+    Builtin {
+        kind: BuiltinType,
+        associated_values: Namespace<ValueId, ValueDef>,
+    },
+    Struct {
+        name: String,
+        ast_node_id: AstNodeId,
+        fields: Namespace<FieldId, FieldDef>,
+        associated_values: Namespace<ValueId, ValueDef>,
+    },
 }
 
 impl TypeDef {
-    pub fn is_builtin(&self) -> bool {
-        matches!(
-            self.name.as_str(),
-            "i32" | "u32" | "isize" | "usize" | "bool" | "Box" | "Vec"
-        )
+    pub fn associated_values(&self) -> &Namespace<ValueId, ValueDef> {
+        match self {
+            Self::Builtin {
+                associated_values, ..
+            }
+            | Self::Struct {
+                associated_values, ..
+            } => associated_values,
+        }
+    }
+
+    pub fn associated_values_mut(&mut self) -> &mut Namespace<ValueId, ValueDef> {
+        match self {
+            Self::Builtin {
+                associated_values, ..
+            }
+            | Self::Struct {
+                associated_values, ..
+            } => associated_values,
+        }
     }
 }
 
@@ -161,7 +223,7 @@ pub enum ValueDefKind {
     Const,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DefId {
     Type(TypeId),
     GlobalValue(ValueId),
@@ -205,10 +267,36 @@ pub enum LocalDefKind {
     Receiver { ty: TypeId },
 }
 
+pub enum Ty {
+    I32,
+    U32,
+    ISize,
+    USize,
+    Bool,
+    Unit,
+    Never,
+    Struct(TypeId),
+    Ref { is_mut: bool, inner: Box<Ty> },
+    Array { elem: Box<Ty>, len: u32 },
+    Box(Box<Ty>),
+    Vec(Vec<Ty>),
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum TypedConst {
+    U32(u32),
+    I32(i32),
+    Usize(u32),
+    Isize(i32),
+}
+
 pub struct SemanticCtx {
     defs: DefTable,
     locals: LocalTable,
     bindings: HashMap<AstNodeId, DefId>,
+
+    ast_types: HashMap<AstNodeId, Ty>,
+    const_values: HashMap<AstNodeId, TypedConst>,
 }
 
 impl SemanticCtx {
@@ -217,6 +305,8 @@ impl SemanticCtx {
             defs: DefTable::new(),
             locals: LocalTable::new(),
             bindings: HashMap::new(),
+            ast_types: HashMap::new(),
+            const_values: HashMap::new(),
         }
     }
 

@@ -2,7 +2,7 @@ use crate::{
     diagnostic::Diagnostic,
     frontend::ast::Crate,
     semantic::{
-        ctx::{Namespace, SemanticCtx, TypeDef, ValueDef, ValueDefKind},
+        ctx::{BuiltinType, Namespace, SemanticCtx, TypeDef, ValueDef, ValueDefKind},
         def_collect::def_collect,
         name_res::name_resolve,
     },
@@ -12,23 +12,21 @@ pub fn semantic_check(ast: &Crate) -> Result<SemanticCtx, Vec<Diagnostic>> {
     let mut diagnostics = Vec::new();
     let mut ctx = SemanticCtx::new();
 
-    for builtin_type in ["i32", "u32", "isize", "usize", "bool", "Box", "Vec"] {
-        let mut type_def = TypeDef {
-            name: builtin_type.to_string(),
-            ast_node_id: None,
-            fields: Namespace::new(),
+    for builtin_type in BuiltinType::ALL {
+        let mut type_def = TypeDef::Builtin {
+            kind: builtin_type,
             associated_values: Namespace::new(),
         };
 
         let associated_functions: &[&str] = match builtin_type {
-            "Box" => &["new"],
-            "Vec" => &["new", "len", "is_empty", "push", "remove"],
+            BuiltinType::Box => &["new"],
+            BuiltinType::Vec => &["new", "len", "is_empty", "push", "remove"],
             _ => &[],
         };
 
         for &name in associated_functions {
             type_def
-                .associated_values
+                .associated_values_mut()
                 .define(
                     name.to_string(),
                     ValueDef {
@@ -40,7 +38,7 @@ pub fn semantic_check(ast: &Crate) -> Result<SemanticCtx, Vec<Diagnostic>> {
                 .expect("builtin define must success");
         }
 
-        ctx.define_type(builtin_type.to_string(), type_def)
+        ctx.define_type(builtin_type.name().to_string(), type_def)
             .expect("builtin name must not collide");
     }
     for builtin_value in ["get_i32", "print_i32", "println_i32"] {

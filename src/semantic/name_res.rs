@@ -148,7 +148,7 @@ impl<'a> Visitor for NameResolution<'a> {
             let is_const = match def_id {
                 DefId::GlobalValue(id) => self.ctx.get_value(id).kind == ValueDefKind::Const,
                 DefId::AssociatedValue { owner, value } => {
-                    self.ctx.get_type(owner).associated_values.get(value).kind
+                    self.ctx.get_type(owner).associated_values().get(value).kind
                         == ValueDefKind::Const
                 }
                 _ => false,
@@ -314,7 +314,7 @@ impl<'a> NameResolution<'a> {
             return Ok(None);
         }
 
-        if let Some(id) = ty_def.associated_values.lookup(name) {
+        if let Some(id) = ty_def.associated_values().lookup(name) {
             Ok(Some(DefId::AssociatedValue {
                 owner: ty,
                 value: id,

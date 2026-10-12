@@ -57,17 +57,11 @@ impl<'a> Visitor for DefCollector<'a> {
 
     fn visit_struct(&mut self, node: &crate::frontend::ast::Struct) {
         let name = &node.name.name;
-        let mut structure = TypeDef {
-            name: name.clone(),
-            ast_node_id: Some(node.id),
-            fields: Namespace::new(),
-            associated_values: Namespace::new(),
-        };
+        let mut fields = Namespace::new();
 
         for field in &node.fields {
             let name = &field.name.name;
-            if structure
-                .fields
+            if fields
                 .define(
                     name.clone(),
                     FieldDef {
@@ -83,6 +77,12 @@ impl<'a> Visitor for DefCollector<'a> {
                 ));
             }
         }
+        let structure = TypeDef::Struct {
+            name: name.clone(),
+            ast_node_id: node.id,
+            fields,
+            associated_values: Namespace::new(),
+        };
         match self.ctx.define_type(name.clone(), structure) {
             Ok(id) => {
                 self.ctx.bind(node.id, DefId::Type(id));
@@ -132,7 +132,7 @@ fn collect_impls(ast: &Crate, ctx: &mut SemanticCtx, diagnostics: &mut Vec<Diagn
                 }
             };
 
-            let result = ctx.get_type_mut(target).associated_values.define(
+            let result = ctx.get_type_mut(target).associated_values_mut().define(
                 name.name.clone(),
                 ValueDef {
                     name: name.name.clone(),
@@ -192,12 +192,11 @@ fn resolve_impl_target(ty: &TyAst, ctx: &SemanticCtx) -> Result<TypeId, Diagnost
         )
     })?;
 
-    if ctx.get_type(id).is_builtin() {
-        return Err(Diagnostic::new(
+    match ctx.get_type(id) {
+        TypeDef::Struct { .. } => Ok(id),
+        TypeDef::Builtin { .. } => Err(Diagnostic::new(
             "Impl target must be a user struct name",
             ty.span.clone(),
-        ));
+        )),
     }
-
-    Ok(id)
 }
