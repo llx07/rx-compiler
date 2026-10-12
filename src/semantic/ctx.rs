@@ -279,7 +279,7 @@ pub enum Ty {
     Ref { is_mut: bool, inner: Box<Ty> },
     Array { elem: Box<Ty>, len: u32 },
     Box(Box<Ty>),
-    Vec(Vec<Ty>),
+    Vec(Box<Ty>),
 }
 
 #[derive(Debug, PartialEq, Eq)]
