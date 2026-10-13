@@ -8,7 +8,7 @@ use crate::{
     },
     semantic::{
         ctx::{BuiltinType, DefId, SemanticCtx, Ty, TypeDef, TypeId, TypedConst, TypedConstKind},
-        visitor::{Visitor, walk_path, walk_struct_field},
+        visitor::{Visitor, walk_path, walk_struct, walk_struct_field},
     },
 };
 
@@ -52,6 +52,30 @@ fn inline_struct_type(ty: &Ty) -> Option<TypeId> {
 }
 
 impl Visitor for TypeResolver<'_> {
+    fn visit_struct(&mut self, node: &Struct) {
+        walk_struct(self, node);
+
+        let DefId::Type(owner) = self
+            .ctx
+            .node_def(node.id)
+            .expect("struct must be bound in def_collect")
+        else {
+            unreachable!("binding of struct must be type");
+        };
+        for field in &node.fields {
+            let Some(ty) = self.ctx.node_ty(field.id).cloned() else {
+                continue;
+            };
+            let TypeDef::Struct { fields, .. } = self.ctx.get_type_def_mut(owner) else {
+                unreachable!("struct definition must have struct fields");
+            };
+            let field_id = fields
+                .lookup(&field.name.name)
+                .expect("collected field must exist");
+            fields.get_mut(field_id).ty = Some(ty);
+        }
+    }
+
     fn visit_path(&mut self, node: &Path) {
         if let Err(diag) = self.check_expression_path_args(node) {
             self.diagnostics.push(diag);

@@ -67,6 +67,7 @@ impl<'a> Visitor for DefCollector<'a> {
                     FieldDef {
                         name: name.clone(),
                         ast_node_id: field.id,
+                        ty: None,
                     },
                 )
                 .is_err()

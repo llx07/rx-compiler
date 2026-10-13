@@ -213,6 +213,7 @@ impl TypeDef {
 pub struct FieldDef {
     pub name: String,
     pub ast_node_id: AstNodeId,
+    pub ty: Option<Ty>,
 }
 
 #[derive(Debug)]
