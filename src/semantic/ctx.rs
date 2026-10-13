@@ -354,6 +354,102 @@ pub struct NodeInfo {
     pub def: Option<DefId>,
     pub ty: Option<Ty>,
     pub constant: Option<TypedConst>,
+    pub expr: Option<ExprSemantics>,
+}
+
+#[derive(Debug, Default)]
+pub struct ExprSemantics {
+    pub place: Option<PlaceInfo>,
+    pub access: Option<ResolvedAccess>,
+    pub adjustment: Option<UseAdjustment>,
+    pub call: Option<ResolvedCall>,
+    pub jump: Option<JumpTarget>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct PlaceInfo {
+    pub writable: bool,
+    pub mutable_access_blocked: bool,
+    pub origin: PlaceOrigin,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum PlaceOrigin {
+    Existing,
+    Temporary,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum ResolvedAccess {
+    Deref(DerefKind),
+
+    Field { owner: TypeId, field: FieldId },
+
+    Index(IndexKind),
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum DerefKind {
+    SharedRef,
+    MutableRef,
+    Box,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum IndexKind {
+    Array,
+    Vec,
+}
+
+#[derive(Debug, Clone)]
+pub struct UseAdjustment {
+    pub target: Ty,
+    pub steps: Vec<Adjustment>,
+}
+
+#[derive(Debug, Clone)]
+pub enum Adjustment {
+    Deref(DerefKind),
+    Borrow { is_mut: bool },
+    Reborrow { is_mut: bool },
+    MaterializeTemporary,
+    NeverTo,
+}
+
+#[derive(Debug, Clone)]
+pub struct ResolvedCall {
+    pub target: CallTarget,
+    pub sig: FnSig,
+}
+
+#[derive(Debug, Clone)]
+pub enum CallTarget {
+    User(DefId),
+    Builtin { op: BuiltinOp, type_args: Vec<Ty> },
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum BuiltinOp {
+    GetI32,
+    PrintI32,
+    PrintlnI32,
+
+    BoxNew,
+    VecNew,
+    VecLen,
+    VecIsEmpty,
+    VecPush,
+    VecRemove,
+
+    ArrayLen,
+    Clone,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum JumpTarget {
+    Return(AstNodeId),
+    Break(AstNodeId),
+    Continue(AstNodeId),
 }
 
 pub struct SemanticCtx {

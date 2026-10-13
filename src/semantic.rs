@@ -1,3 +1,4 @@
+mod body_check;
 mod ctx;
 mod def_collect;
 mod name_res;
