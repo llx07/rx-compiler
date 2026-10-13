@@ -1,6 +1,6 @@
 use std::collections::{HashMap, hash_map::Entry};
 
-use crate::frontend::ast::AstNodeId;
+use crate::frontend::ast::{AstNodeId, TraitKind};
 
 /// IDs are local to this namespace and must be queried through the same instance.
 #[derive(Debug)]
@@ -35,6 +35,13 @@ where
     pub fn iter(&self) -> impl Iterator<Item = (I, &D)> {
         self.definitions
             .iter()
+            .enumerate()
+            .map(|(index, def)| (I::from(index as u32), def))
+    }
+
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = (I, &mut D)> {
+        self.definitions
+            .iter_mut()
             .enumerate()
             .map(|(index, def)| (I::from(index as u32), def))
     }
@@ -170,41 +177,61 @@ impl DefTable {
         }
     }
 }
+#[derive(Debug, Clone, Copy, Default)]
+pub struct TraitSet(u8);
+
+impl TraitSet {
+    pub fn new() -> Self {
+        Self(0)
+    }
+
+    pub fn contains(&self, tr: TraitKind) -> bool {
+        let bit = 1u8 << (tr as u8);
+        self.0 & bit != 0
+    }
+
+    pub fn set(&mut self, tr: TraitKind) {
+        self.0 |= 1u8 << (tr as u8);
+    }
+
+    pub fn unset(&mut self, tr: TraitKind) {
+        self.0 &= !(1u8 << (tr as u8));
+    }
+}
 
 #[derive(Debug)]
 pub enum TypeDef {
-    Builtin {
-        kind: BuiltinType,
-        associated_values: Namespace<ValueId, ValueDef>,
-    },
-    Struct {
-        name: String,
-        ast_node_id: AstNodeId,
-        fields: Namespace<FieldId, FieldDef>,
-        associated_values: Namespace<ValueId, ValueDef>,
-    },
+    Builtin(BuiltinDef),
+    Struct(StructDef),
+}
+
+#[derive(Debug)]
+pub struct BuiltinDef {
+    pub kind: BuiltinType,
+    pub associated_values: Namespace<ValueId, ValueDef>,
+}
+
+#[derive(Debug)]
+pub struct StructDef {
+    pub name: String,
+    pub ast_node_id: AstNodeId,
+    pub fields: Namespace<FieldId, FieldDef>,
+    pub associated_values: Namespace<ValueId, ValueDef>,
+    pub traits: TraitSet,
 }
 
 impl TypeDef {
     pub fn associated_values(&self) -> &Namespace<ValueId, ValueDef> {
         match self {
-            Self::Builtin {
-                associated_values, ..
-            }
-            | Self::Struct {
-                associated_values, ..
-            } => associated_values,
+            Self::Builtin(def) => &def.associated_values,
+            Self::Struct(def) => &def.associated_values,
         }
     }
 
     pub fn associated_values_mut(&mut self) -> &mut Namespace<ValueId, ValueDef> {
         match self {
-            Self::Builtin {
-                associated_values, ..
-            }
-            | Self::Struct {
-                associated_values, ..
-            } => associated_values,
+            Self::Builtin(def) => &mut def.associated_values,
+            Self::Struct(def) => &mut def.associated_values,
         }
     }
 }
@@ -392,6 +419,10 @@ impl SemanticCtx {
         self.defs.types.get_mut(id)
     }
 
+    pub fn iter_types_mut(&mut self) -> impl Iterator<Item = (TypeId, &mut TypeDef)> {
+        self.defs.types.iter_mut()
+    }
+
     /// Records the definition ID associated with an AST node.
     pub fn record_node_def(&mut self, node: AstNodeId, def: DefId) {
         let old = self.node_info.entry(node).or_default().def.replace(def);
@@ -424,5 +455,32 @@ impl SemanticCtx {
 
     pub fn record_node_ty(&mut self, node: AstNodeId, value: Ty) {
         self.node_info.entry(node).or_default().ty = Some(value);
+    }
+
+    pub fn implements_trait(&self, ty: &Ty, tr: TraitKind) -> bool {
+        match ty {
+            Ty::I32 | Ty::U32 | Ty::ISize | Ty::USize | Ty::Bool | Ty::Unit | Ty::Never => true,
+            // Trust declared derives; struct field validation is a separate step.
+            Ty::Struct(id) => self.has_derive(*id, tr).unwrap_or(false),
+            Ty::Ref { is_mut, inner } => match tr {
+                TraitKind::Copy | TraitKind::Clone => !is_mut,
+                TraitKind::PartialEq | TraitKind::Eq => self.implements_trait(inner, tr),
+            },
+            Ty::Array { elem, .. } => self.implements_trait(elem, tr),
+            Ty::Box(inner) | Ty::Vec(inner) => match tr {
+                TraitKind::Copy => false,
+                TraitKind::Clone | TraitKind::PartialEq | TraitKind::Eq => {
+                    self.implements_trait(inner, tr)
+                }
+            },
+        }
+    }
+
+    /// Returns the declared derive capability of a user struct, or `None` for a builtin type.
+    pub fn has_derive(&self, id: TypeId, tr: TraitKind) -> Option<bool> {
+        match self.get_type_def(id) {
+            TypeDef::Struct(def) => Some(def.traits.contains(tr)),
+            TypeDef::Builtin(_) => None,
+        }
     }
 }

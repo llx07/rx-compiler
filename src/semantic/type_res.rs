@@ -69,13 +69,14 @@ impl Visitor for TypeResolver<'_> {
             let Some(ty) = self.ctx.node_ty(field.id).cloned() else {
                 continue;
             };
-            let TypeDef::Struct { fields, .. } = self.ctx.get_type_def_mut(owner) else {
+            let TypeDef::Struct(def) = self.ctx.get_type_def_mut(owner) else {
                 unreachable!("struct definition must have struct fields");
             };
-            let field_id = fields
+            let field_id = def
+                .fields
                 .lookup(&field.name.name)
                 .expect("collected field must exist");
-            fields.get_mut(field_id).ty = Some(ty);
+            def.fields.get_mut(field_id).ty = Some(ty);
         }
     }
 
@@ -223,8 +224,8 @@ impl<'a> TypeResolver<'a> {
                 self.ctx
                     .lookup_type_def(&name.name)
                     .map(|id| match self.ctx.get_type_def(id) {
-                        TypeDef::Builtin { kind, .. } => kind.type_arg_count(),
-                        TypeDef::Struct { .. } => 0,
+                        TypeDef::Builtin(def) => def.kind.type_arg_count(),
+                        TypeDef::Struct(_) => 0,
                     })
             }
             PathIdent::SelfType => Some(0),
@@ -274,8 +275,8 @@ impl<'a> TypeResolver<'a> {
                 };
 
                 let builtin = match self.ctx.get_type_def(type_id) {
-                    TypeDef::Builtin { kind, .. } => Some(*kind),
-                    TypeDef::Struct { .. } => None,
+                    TypeDef::Builtin(def) => Some(def.kind),
+                    TypeDef::Struct(_) => None,
                 };
                 let expected_args = match builtin {
                     Some(kind) => kind.type_arg_count(),
@@ -477,10 +478,10 @@ impl<'a> TypeResolver<'a> {
             .filter_map(|field| {
                 let ty = self.ctx.node_ty(field.id).expect("field is resolved");
                 let type_id = inline_struct_type(ty)?;
-                let TypeDef::Struct { ast_node_id, .. } = self.ctx.get_type_def(type_id) else {
+                let TypeDef::Struct(def) = self.ctx.get_type_def(type_id) else {
                     unreachable!("field target must be a struct");
                 };
-                Some(*ast_node_id)
+                Some(def.ast_node_id)
             })
             .collect();
 

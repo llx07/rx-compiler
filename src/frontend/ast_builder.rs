@@ -5,7 +5,7 @@ use crate::{
     frontend::ast::{
         ArrayExpr, ArrayTy, AssignExpr, AssignOp, AssociatedItem, AssociatedItemKind, AstNodeId,
         BinaryExpr, BinaryOp, Binding, BlockExpr, CallExpr, CastExpr, ConstItem, ConstValue,
-        ConstValueKind, Crate, Derive, DeriveKind, ElseBranch, Expr, ExprKind, ExprStmt, FieldExpr,
+        ConstValueKind, Crate, Derive, TraitKind, ElseBranch, Expr, ExprKind, ExprStmt, FieldExpr,
         Function, Ident, IfExpr, Impl, IndexExpr, IntLiteral, IntSuffix, Item, ItemKind, LetStmt,
         LiteralExpr, LoopExpr, MethodCallExpr, Param, Path, PathIdent, PathSegment, Receiver,
         RefTy, Stmt, StmtKind, Struct, StructExpr, StructExprField, StructField, TyAst, TyAstKind,
@@ -310,10 +310,10 @@ impl AstBuilder {
             .expect("child of derive name must be a terminal");
 
         let kind = match terminal.symbol().token_type() {
-            COPY => DeriveKind::Copy,
-            CLONE => DeriveKind::Clone,
-            PARTIAL_EQ => DeriveKind::PartialEq,
-            EQ => DeriveKind::Eq,
+            COPY => TraitKind::Copy,
+            CLONE => TraitKind::Clone,
+            PARTIAL_EQ => TraitKind::PartialEq,
+            EQ => TraitKind::Eq,
             _ => unreachable!("unexpected token in deriveName"),
         };
 

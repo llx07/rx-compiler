@@ -3,8 +3,8 @@ use crate::{
     frontend::ast::{AssociatedItemKind, Crate, ItemKind, PathIdent, TyAst, TyAstKind},
     semantic::{
         ctx::{
-            DefId, FieldDef, FunctionDef, Namespace, SemanticCtx, TypeDef, TypeId, ValueDef,
-            ValueDefKind,
+            DefId, FieldDef, FunctionDef, Namespace, SemanticCtx, StructDef, TraitSet, TypeDef,
+            TypeId, ValueDef, ValueDefKind,
         },
         visitor::Visitor,
     },
@@ -81,12 +81,19 @@ impl<'a> Visitor for DefCollector<'a> {
                 ));
             }
         }
-        let structure = TypeDef::Struct {
+
+        let mut traits = TraitSet::new();
+        for derive in &node.derives {
+            traits.set(derive.kind);
+        }
+
+        let structure = TypeDef::Struct(StructDef {
             name: name.clone(),
             ast_node_id: node.id,
             fields,
+            traits,
             associated_values: Namespace::new(),
-        };
+        });
         match self.ctx.define_type(name.clone(), structure) {
             Ok(id) => {
                 self.ctx.record_node_def(node.id, DefId::Type(id));
@@ -199,8 +206,8 @@ fn resolve_impl_target(ty: &TyAst, ctx: &SemanticCtx) -> Result<TypeId, Diagnost
     })?;
 
     match ctx.get_type_def(id) {
-        TypeDef::Struct { .. } => Ok(id),
-        TypeDef::Builtin { .. } => Err(Diagnostic::new(
+        TypeDef::Struct(_) => Ok(id),
+        TypeDef::Builtin(_) => Err(Diagnostic::new(
             "Impl target must be a user struct name",
             ty.span.clone(),
         )),

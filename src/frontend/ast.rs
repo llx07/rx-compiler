@@ -80,12 +80,12 @@ pub struct Struct {
 
 #[derive(Debug)]
 pub struct Derive {
-    pub kind: DeriveKind,
+    pub kind: TraitKind,
     pub span: Span,
 }
 
-#[derive(Debug)]
-pub enum DeriveKind {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum TraitKind {
     Copy,
     Clone,
     PartialEq,
