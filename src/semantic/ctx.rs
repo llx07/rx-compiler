@@ -223,6 +223,12 @@ pub struct ValueDef {
     pub kind: ValueDefKind,
 }
 
+impl ValueDef {
+    pub fn is_const(&self) -> bool {
+        self.kind == ValueDefKind::Const
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ValueDefKind {
     BuiltinFunction,
@@ -304,13 +310,17 @@ pub enum TypedConstKind {
     Bool,
 }
 
+#[derive(Debug, Default)]
+pub struct NodeInfo {
+    pub def: Option<DefId>,
+    pub ty: Option<Ty>,
+    pub constant: Option<TypedConst>,
+}
+
 pub struct SemanticCtx {
     defs: DefTable,
     locals: LocalTable,
-    node_defs: HashMap<AstNodeId, DefId>,
-
-    ast_types: HashMap<AstNodeId, Ty>,
-    const_values: HashMap<AstNodeId, TypedConst>,
+    node_info: HashMap<AstNodeId, NodeInfo>,
 }
 
 impl SemanticCtx {
@@ -318,9 +328,7 @@ impl SemanticCtx {
         Self {
             defs: DefTable::new(),
             locals: LocalTable::new(),
-            node_defs: HashMap::new(),
-            ast_types: HashMap::new(),
-            const_values: HashMap::new(),
+            node_info: HashMap::new(),
         }
     }
 
@@ -340,8 +348,28 @@ impl SemanticCtx {
         self.defs.values.lookup(name)
     }
 
-    pub fn get_value_def(&self, id: ValueId) -> &ValueDef {
-        self.defs.values.get(id)
+    pub fn value_def(&self, id: DefId) -> Option<&ValueDef> {
+        match id {
+            DefId::GlobalValue(value) => Some(self.defs.values.get(value)),
+            DefId::AssociatedValue { owner, value } => {
+                Some(self.defs.types.get(owner).associated_values().get(value))
+            }
+            _ => None,
+        }
+    }
+
+    pub fn value_def_mut(&mut self, id: DefId) -> Option<&mut ValueDef> {
+        match id {
+            DefId::GlobalValue(value) => Some(self.defs.values.get_mut(value)),
+            DefId::AssociatedValue { owner, value } => Some(
+                self.defs
+                    .types
+                    .get_mut(owner)
+                    .associated_values_mut()
+                    .get_mut(value),
+            ),
+            _ => None,
+        }
     }
 
     pub fn get_type_def(&self, id: TypeId) -> &TypeDef {
@@ -354,12 +382,12 @@ impl SemanticCtx {
 
     /// Records the definition ID associated with an AST node.
     pub fn record_node_def(&mut self, node: AstNodeId, def: DefId) {
-        let old = self.node_defs.insert(node, def);
+        let old = self.node_info.entry(node).or_default().def.replace(def);
         debug_assert!(old.is_none());
     }
 
     pub fn node_def(&self, node: AstNodeId) -> Option<DefId> {
-        self.node_defs.get(&node).copied()
+        self.node_info.get(&node).and_then(|info| info.def)
     }
 
     pub fn alloc_local(&mut self, def: LocalDef) -> LocalId {
@@ -370,19 +398,19 @@ impl SemanticCtx {
         self.locals.get(id)
     }
 
-    pub fn const_value(&self, node: AstNodeId) -> Option<TypedConst> {
-        self.const_values.get(&node).copied()
+    pub fn node_const(&self, node: AstNodeId) -> Option<TypedConst> {
+        self.node_info.get(&node).and_then(|info| info.constant)
     }
 
-    pub fn record_const_value(&mut self, node: AstNodeId, value: TypedConst) {
-        self.const_values.insert(node, value);
+    pub fn record_node_const(&mut self, node: AstNodeId, value: TypedConst) {
+        self.node_info.entry(node).or_default().constant = Some(value);
     }
 
-    pub fn get_ast_type(&self, node: AstNodeId) -> Option<&Ty> {
-        self.ast_types.get(&node)
+    pub fn node_ty(&self, node: AstNodeId) -> Option<&Ty> {
+        self.node_info.get(&node).and_then(|info| info.ty.as_ref())
     }
 
-    pub fn record_type(&mut self, node: AstNodeId, value: Ty) {
-        self.ast_types.insert(node, value);
+    pub fn record_node_ty(&mut self, node: AstNodeId, value: Ty) {
+        self.node_info.entry(node).or_default().ty = Some(value);
     }
 }

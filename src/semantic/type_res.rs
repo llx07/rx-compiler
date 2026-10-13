@@ -7,10 +7,7 @@ use crate::{
         ItemKind, Path, PathIdent, Struct, TyAstKind,
     },
     semantic::{
-        ctx::{
-            BuiltinType, DefId, SemanticCtx, Ty, TypeDef, TypeId, TypedConst, TypedConstKind,
-            ValueDefKind,
-        },
+        ctx::{BuiltinType, DefId, SemanticCtx, Ty, TypeDef, TypeId, TypedConst, TypedConstKind},
         visitor::{Visitor, walk_path, walk_struct_field},
     },
 };
@@ -64,8 +61,8 @@ impl Visitor for TypeResolver<'_> {
 
     fn visit_struct_field(&mut self, node: &crate::frontend::ast::StructField) {
         walk_struct_field(self, node);
-        if let Some(ty) = self.ctx.get_ast_type(node.ty.id) {
-            self.ctx.record_type(node.id, ty.clone());
+        if let Some(ty) = self.ctx.node_ty(node.ty.id) {
+            self.ctx.record_node_ty(node.id, ty.clone());
         }
     }
 
@@ -233,7 +230,7 @@ impl<'a> TypeResolver<'a> {
                 }
             }
         };
-        self.ctx.record_type(node.id, ty.clone());
+        self.ctx.record_node_ty(node.id, ty.clone());
         Ok(ty)
     }
 
@@ -313,19 +310,11 @@ impl<'a> TypeResolver<'a> {
                     Diagnostic::new("unresolved constant path", path.span.clone())
                 })?;
 
-                let value_def = match def {
-                    DefId::AssociatedValue { owner, value } => {
-                        self.ctx.get_type_def(owner).associated_values().get(value)
-                    }
-                    DefId::GlobalValue(value) => self.ctx.get_value_def(value),
-                    _ => {
-                        return Err(Diagnostic::new(
-                            "path must be a constant",
-                            path.span.clone(),
-                        ));
-                    }
-                };
-                if value_def.kind != ValueDefKind::Const {
+                let value_def = self
+                    .ctx
+                    .value_def(def)
+                    .ok_or_else(|| Diagnostic::new("path must be a constant", path.span.clone()))?;
+                if !value_def.is_const() {
                     return Err(Diagnostic::new(
                         "path must be a constant",
                         path.span.clone(),
@@ -347,12 +336,12 @@ impl<'a> TypeResolver<'a> {
                 Ok(resolved)
             }
         }?;
-        self.ctx.record_const_value(node.id, resolved);
+        self.ctx.record_node_const(node.id, resolved);
         Ok(resolved)
     }
 
     pub fn resolve_const_item(&mut self, item: &ConstItem) -> Result<TypedConst, Diagnostic> {
-        if let Some(value) = self.ctx.const_value(item.id) {
+        if let Some(value) = self.ctx.node_const(item.id) {
             return Ok(value);
         }
         if !self.resolving_consts.insert(item.id) {
@@ -381,7 +370,7 @@ impl<'a> TypeResolver<'a> {
 
         self.resolving_consts.remove(&item.id);
         if let Ok(value) = result {
-            self.ctx.record_const_value(item.id, value);
+            self.ctx.record_node_const(item.id, value);
         }
         result
     }
@@ -412,7 +401,7 @@ impl<'a> TypeResolver<'a> {
             .fields
             .iter()
             .filter_map(|field| {
-                let ty = self.ctx.get_ast_type(field.id).expect("field is resolved");
+                let ty = self.ctx.node_ty(field.id).expect("field is resolved");
                 let type_id = inline_struct_type(ty)?;
                 let TypeDef::Struct { ast_node_id, .. } = self.ctx.get_type_def(type_id) else {
                     unreachable!("field target must be a struct");

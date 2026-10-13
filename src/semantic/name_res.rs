@@ -4,7 +4,7 @@ use crate::{
     diagnostic::Diagnostic,
     frontend::ast::{ConstValueKind, Crate, ExprKind, Path, PathIdent, PathSegment, TyAstKind},
     semantic::{
-        ctx::{DefId, LocalDef, LocalDefKind, LocalId, SemanticCtx, TypeId, ValueDefKind},
+        ctx::{DefId, LocalDef, LocalDefKind, LocalId, SemanticCtx, TypeId},
         visitor::{
             Visitor, walk_block, walk_const_value, walk_expr, walk_function, walk_let_stmt,
             walk_struct, walk_ty,
@@ -145,16 +145,7 @@ impl<'a> Visitor for NameResolution<'a> {
                 }
             };
 
-            let is_const = match def_id {
-                DefId::GlobalValue(id) => self.ctx.get_value_def(id).kind == ValueDefKind::Const,
-                DefId::AssociatedValue { owner, value } => {
-                    self.ctx.get_type_def(owner).associated_values().get(value).kind
-                        == ValueDefKind::Const
-                }
-                _ => false,
-            };
-
-            if !is_const {
+            if !self.ctx.value_def(def_id).is_some_and(|def| def.is_const()) {
                 self.diagnostics
                     .push(Diagnostic::new("Not a const value", node.span.clone()));
                 return;
