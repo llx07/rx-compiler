@@ -230,11 +230,22 @@ impl ValueDef {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ValueDefKind {
     BuiltinFunction,
-    Function,
+    Function(FunctionDef),
     Const,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FunctionDef {
+    pub sig: Option<FnSig>,
+}
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FnSig {
+    pub receiver: Option<Ty>,
+    pub params: Vec<Ty>, // not including receiver
+    pub result: Ty,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

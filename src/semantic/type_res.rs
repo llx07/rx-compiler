@@ -7,8 +7,11 @@ use crate::{
         ItemKind, Path, PathIdent, Struct, TyAstKind,
     },
     semantic::{
-        ctx::{BuiltinType, DefId, SemanticCtx, Ty, TypeDef, TypeId, TypedConst, TypedConstKind},
-        visitor::{Visitor, walk_path, walk_struct, walk_struct_field},
+        ctx::{
+            BuiltinType, DefId, FnSig, SemanticCtx, Ty, TypeDef, TypeId, TypedConst,
+            TypedConstKind, ValueDefKind,
+        },
+        visitor::{Visitor, walk_function, walk_path, walk_struct, walk_struct_field},
     },
 };
 
@@ -106,6 +109,53 @@ impl Visitor for TypeResolver<'_> {
         if let Err(diag) = self.resolve_const_value(node, &TypedConstKind::Usize) {
             self.diagnostics.push(diag);
         }
+    }
+
+    fn visit_function(&mut self, node: &crate::frontend::ast::Function) {
+        walk_function(self, node);
+
+        let Some(params) = node
+            .params
+            .iter()
+            .map(|param| self.ctx.node_ty(param.ty.id).cloned())
+            .collect::<Option<Vec<_>>>()
+        else {
+            return;
+        };
+
+        let Some(result) = self.ctx.node_ty(node.return_ty.id).cloned() else {
+            return;
+        };
+
+        let def_id = self.ctx.node_def(node.id).expect("function is collected");
+        let receiver = node.receiver.as_ref().map(|receiver| {
+            let DefId::AssociatedValue { owner, .. } = def_id else {
+                unreachable!("receiver must belong to an impl");
+            };
+            let ty = Ty::Struct(owner);
+            if receiver.is_ref {
+                Ty::Ref {
+                    is_mut: receiver.is_mut,
+                    inner: Box::new(ty),
+                }
+            } else {
+                ty
+            }
+        });
+
+        let ValueDefKind::Function(fn_def) = &mut self
+            .ctx
+            .value_def_mut(def_id)
+            .expect("function is a value")
+            .kind
+        else {
+            unreachable!("collected function must have a function definition");
+        };
+        fn_def.sig = Some(FnSig {
+            receiver,
+            params,
+            result,
+        });
     }
 }
 

@@ -2,7 +2,10 @@ use crate::{
     diagnostic::Diagnostic,
     frontend::ast::{AssociatedItemKind, Crate, ItemKind, PathIdent, TyAst, TyAstKind},
     semantic::{
-        ctx::{DefId, FieldDef, Namespace, SemanticCtx, TypeDef, TypeId, ValueDef, ValueDefKind},
+        ctx::{
+            DefId, FieldDef, FunctionDef, Namespace, SemanticCtx, TypeDef, TypeId, ValueDef,
+            ValueDefKind,
+        },
         visitor::Visitor,
     },
 };
@@ -21,7 +24,7 @@ impl<'a> Visitor for DefCollector<'a> {
             ValueDef {
                 name: name.clone(),
                 ast_node_id: Some(node.id),
-                kind: ValueDefKind::Function,
+                kind: ValueDefKind::Function(FunctionDef { sig: None }),
             },
         ) {
             Ok(id) => {
@@ -125,9 +128,11 @@ fn collect_impls(ast: &Crate, ctx: &mut SemanticCtx, diagnostics: &mut Vec<Diagn
 
         for item in &implementation.items {
             let (ast_node_id, name, kind) = match &item.kind {
-                AssociatedItemKind::Function(function) => {
-                    (function.id, &function.name, ValueDefKind::Function)
-                }
+                AssociatedItemKind::Function(function) => (
+                    function.id,
+                    &function.name,
+                    ValueDefKind::Function(FunctionDef { sig: None }),
+                ),
                 AssociatedItemKind::ConstItem(constant) => {
                     (constant.id, &constant.name, ValueDefKind::Const)
                 }
