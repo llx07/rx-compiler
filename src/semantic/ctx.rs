@@ -1,5 +1,6 @@
 use std::collections::{HashMap, hash_map::Entry};
 
+use crate::diagnostic::Span;
 use crate::frontend::ast::{AstNodeId, TraitKind};
 
 /// IDs are local to this namespace and must be queried through the same instance.
@@ -215,6 +216,7 @@ pub struct BuiltinDef {
 pub struct StructDef {
     pub name: String,
     pub ast_node_id: AstNodeId,
+    pub span: Span,
     pub fields: Namespace<FieldId, FieldDef>,
     pub associated_values: Namespace<ValueId, ValueDef>,
     pub traits: TraitSet,
@@ -240,6 +242,7 @@ impl TypeDef {
 pub struct FieldDef {
     pub name: String,
     pub ast_node_id: AstNodeId,
+    pub span: Span,
     pub ty: Option<Ty>,
 }
 
@@ -248,6 +251,8 @@ pub struct ValueDef {
     pub name: String,
     /// The function or constant node ID; `None` for builtins.
     pub ast_node_id: Option<AstNodeId>,
+    /// The function or constant node span; `None` for builtins.
+    pub span: Option<Span>,
     pub kind: ValueDefKind,
 }
 
@@ -308,6 +313,7 @@ impl LocalTable {
 pub struct LocalDef {
     pub name: String,
     pub ast_node_id: AstNodeId,
+    pub span: Span,
     pub is_mut: bool,
     pub kind: LocalDefKind,
 }
@@ -513,6 +519,10 @@ impl SemanticCtx {
 
     pub fn get_type_def_mut(&mut self, id: TypeId) -> &mut TypeDef {
         self.defs.types.get_mut(id)
+    }
+
+    pub fn iter_types(&self) -> impl Iterator<Item = (TypeId, &TypeDef)> {
+        self.defs.types.iter()
     }
 
     pub fn iter_types_mut(&mut self) -> impl Iterator<Item = (TypeId, &mut TypeDef)> {

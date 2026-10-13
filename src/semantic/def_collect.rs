@@ -24,6 +24,7 @@ impl<'a> Visitor for DefCollector<'a> {
             ValueDef {
                 name: name.clone(),
                 ast_node_id: Some(node.id),
+                span: Some(node.span.clone()),
                 kind: ValueDefKind::Function(FunctionDef { sig: None }),
             },
         ) {
@@ -45,6 +46,7 @@ impl<'a> Visitor for DefCollector<'a> {
             ValueDef {
                 name: name.clone(),
                 ast_node_id: Some(node.id),
+                span: Some(node.span.clone()),
                 kind: ValueDefKind::Const,
             },
         ) {
@@ -70,6 +72,7 @@ impl<'a> Visitor for DefCollector<'a> {
                     FieldDef {
                         name: name.clone(),
                         ast_node_id: field.id,
+                        span: field.span.clone(),
                         ty: None,
                     },
                 )
@@ -90,6 +93,7 @@ impl<'a> Visitor for DefCollector<'a> {
         let structure = TypeDef::Struct(StructDef {
             name: name.clone(),
             ast_node_id: node.id,
+            span: node.span.clone(),
             fields,
             traits,
             associated_values: Namespace::new(),
@@ -134,15 +138,19 @@ fn collect_impls(ast: &Crate, ctx: &mut SemanticCtx, diagnostics: &mut Vec<Diagn
         ctx.record_node_def(implementation.ty.id, DefId::Type(target));
 
         for item in &implementation.items {
-            let (ast_node_id, name, kind) = match &item.kind {
+            let (ast_node_id, span, name, kind) = match &item.kind {
                 AssociatedItemKind::Function(function) => (
                     function.id,
+                    &function.span,
                     &function.name,
                     ValueDefKind::Function(FunctionDef { sig: None }),
                 ),
-                AssociatedItemKind::ConstItem(constant) => {
-                    (constant.id, &constant.name, ValueDefKind::Const)
-                }
+                AssociatedItemKind::ConstItem(constant) => (
+                    constant.id,
+                    &constant.span,
+                    &constant.name,
+                    ValueDefKind::Const,
+                ),
             };
 
             let result = ctx.get_type_def_mut(target).associated_values_mut().define(
@@ -150,6 +158,7 @@ fn collect_impls(ast: &Crate, ctx: &mut SemanticCtx, diagnostics: &mut Vec<Diagn
                 ValueDef {
                     name: name.name.clone(),
                     ast_node_id: Some(ast_node_id),
+                    span: Some(span.clone()),
                     kind,
                 },
             );

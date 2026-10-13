@@ -63,6 +63,7 @@ impl<'a> Visitor for NameResolution<'a> {
                 let self_id = self.ctx.alloc_local(LocalDef {
                     name: "self".to_string(),
                     ast_node_id: receiver.id,
+                    span: receiver.span.clone(),
                     is_mut: receiver.is_mut && !receiver.is_ref,
                     kind: LocalDefKind::Receiver { ty: target },
                 });
@@ -93,6 +94,7 @@ impl<'a> Visitor for NameResolution<'a> {
             let param_id = self.ctx.alloc_local(LocalDef {
                 name: name.clone(),
                 ast_node_id: param.id,
+                span: param.span.clone(),
                 is_mut: param.binding.is_mut,
                 kind: super::ctx::LocalDefKind::Param,
             });
@@ -119,6 +121,7 @@ impl<'a> Visitor for NameResolution<'a> {
         let let_id = self.ctx.alloc_local(LocalDef {
             name: node.binding.name.name.clone(),
             ast_node_id: node.id,
+            span: node.span.clone(),
             is_mut: node.binding.is_mut,
             kind: super::ctx::LocalDefKind::Let,
         });

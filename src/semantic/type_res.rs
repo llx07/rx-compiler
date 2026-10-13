@@ -20,10 +20,9 @@ pub struct TypeResolver<'a> {
     diagnostics: &'a mut Vec<Diagnostic>,
 
     const_items: HashMap<AstNodeId, &'a ConstItem>,
-    struct_items: HashMap<AstNodeId, &'a Struct>,
 
     resolving_consts: HashSet<AstNodeId>,
-    resolving_structs: HashMap<AstNodeId, VisitState>,
+    resolving_structs: HashMap<TypeId, VisitState>,
 }
 
 enum VisitState {
@@ -167,7 +166,6 @@ impl<'a> TypeResolver<'a> {
         diagnostics: &'a mut Vec<Diagnostic>,
     ) -> Self {
         let mut const_items = HashMap::new();
-        let mut struct_items = HashMap::new();
         for item in &ast.items {
             match &item.kind {
                 ItemKind::Const(constant) => {
@@ -180,9 +178,6 @@ impl<'a> TypeResolver<'a> {
                         }
                     }
                 }
-                ItemKind::Struct(structure) => {
-                    struct_items.insert(structure.id, structure);
-                }
                 _ => {}
             }
         }
@@ -191,7 +186,6 @@ impl<'a> TypeResolver<'a> {
             ctx,
             diagnostics,
             const_items,
-            struct_items,
             resolving_consts: HashSet::new(),
             resolving_structs: HashMap::new(),
         }
@@ -450,38 +444,39 @@ impl<'a> TypeResolver<'a> {
         result
     }
 
-    fn check_recursive_structs_impl(&mut self, ast_node_id: AstNodeId) {
+    fn check_recursive_structs_impl(&mut self, type_id: TypeId) {
         if self
             .resolving_structs
-            .get(&ast_node_id)
+            .get(&type_id)
             .is_some_and(|x| matches!(x, VisitState::Done))
         {
             return;
         }
         if self
             .resolving_structs
-            .get(&ast_node_id)
+            .get(&type_id)
             .is_some_and(|x| matches!(x, VisitState::Visiting))
         {
+            let TypeDef::Struct(def) = self.ctx.get_type_def(type_id) else {
+                unreachable!("recursive layout checks must target structs");
+            };
             self.diagnostics.push(Diagnostic::new(
                 "recursive struct definition",
-                self.struct_items[&ast_node_id].span.clone(),
+                def.span.clone(),
             ));
             return;
         }
-        self.resolving_structs
-            .insert(ast_node_id, VisitState::Visiting);
+        self.resolving_structs.insert(type_id, VisitState::Visiting);
 
-        let targets: Vec<_> = self.struct_items[&ast_node_id]
+        let TypeDef::Struct(def) = self.ctx.get_type_def(type_id) else {
+            unreachable!("recursive layout checks must target structs");
+        };
+        let targets: Vec<_> = def
             .fields
             .iter()
-            .filter_map(|field| {
-                let ty = self.ctx.node_ty(field.id).expect("field is resolved");
-                let type_id = inline_struct_type(ty)?;
-                let TypeDef::Struct(def) = self.ctx.get_type_def(type_id) else {
-                    unreachable!("field target must be a struct");
-                };
-                Some(def.ast_node_id)
+            .filter_map(|(_, field)| {
+                let ty = field.ty.as_ref().expect("field is resolved");
+                inline_struct_type(ty)
             })
             .collect();
 
@@ -489,11 +484,15 @@ impl<'a> TypeResolver<'a> {
             self.check_recursive_structs_impl(target);
         }
 
-        self.resolving_structs.insert(ast_node_id, VisitState::Done);
+        self.resolving_structs.insert(type_id, VisitState::Done);
     }
 
     fn check_recursive_structs(&mut self) {
-        let ids: Vec<_> = self.struct_items.keys().copied().collect();
+        let ids: Vec<_> = self
+            .ctx
+            .iter_types()
+            .filter_map(|(id, def)| matches!(def, TypeDef::Struct(_)).then_some(id))
+            .collect();
         for id in ids {
             self.check_recursive_structs_impl(id);
         }

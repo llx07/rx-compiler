@@ -2,6 +2,7 @@ use crate::{
     diagnostic::Diagnostic,
     frontend::ast::Crate,
     semantic::{
+        body_check::body_check,
         ctx::{BuiltinDef, BuiltinType, Namespace, SemanticCtx, TypeDef, ValueDef, ValueDefKind},
         def_collect::def_collect,
         name_res::name_resolve,
@@ -34,6 +35,7 @@ pub fn semantic_check(ast: &Crate) -> Result<SemanticCtx, Vec<Diagnostic>> {
                     ValueDef {
                         name: name.to_string(),
                         ast_node_id: None,
+                        span: None,
                         kind: ValueDefKind::BuiltinFunction,
                     },
                 )
@@ -49,6 +51,7 @@ pub fn semantic_check(ast: &Crate) -> Result<SemanticCtx, Vec<Diagnostic>> {
             ValueDef {
                 name: builtin_value.to_string(),
                 ast_node_id: None,
+                span: None,
                 kind: ValueDefKind::BuiltinFunction,
             },
         )
@@ -71,6 +74,11 @@ pub fn semantic_check(ast: &Crate) -> Result<SemanticCtx, Vec<Diagnostic>> {
     }
 
     trait_check(ast, &mut ctx, &mut diagnostics);
+    if !diagnostics.is_empty() {
+        return Err(diagnostics);
+    }
+
+    body_check(ast, &mut ctx, &mut diagnostics);
     if !diagnostics.is_empty() {
         return Err(diagnostics);
     }
