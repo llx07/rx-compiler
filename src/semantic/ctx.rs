@@ -360,6 +360,8 @@ pub struct NodeInfo {
     pub def: Option<DefId>,
     pub ty: Option<Ty>,
     pub constant: Option<TypedConst>,
+    /// Parsed literal magnitude or boolean 0/1, before expression typing.
+    pub literal: Option<i64>,
     pub expr: Option<ExprSemantics>,
 }
 
@@ -545,6 +547,14 @@ impl SemanticCtx {
 
     pub fn record_node_const(&mut self, node: AstNodeId, value: TypedConst) {
         self.node_info.entry(node).or_default().constant = Some(value);
+    }
+
+    pub fn node_literal(&self, node: AstNodeId) -> Option<i64> {
+        self.node_info.get(&node).and_then(|info| info.literal)
+    }
+
+    pub fn record_node_literal(&mut self, node: AstNodeId, value: i64) {
+        self.node_info.entry(node).or_default().literal = Some(value);
     }
 
     pub fn node_ty(&self, node: AstNodeId) -> Option<&Ty> {

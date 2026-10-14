@@ -3,15 +3,15 @@ use std::collections::{HashMap, HashSet};
 use crate::{
     diagnostic::Diagnostic,
     frontend::ast::{
-        AssociatedItemKind, AstNodeId, ConstItem, ConstValue, ConstValueKind, Crate, IntSuffix,
-        ItemKind, Path, PathIdent, Struct, TyAstKind,
+        AssociatedItemKind, AstNodeId, ConstItem, ConstValue, ConstValueKind, Crate, Expr,
+        ExprKind, IntSuffix, ItemKind, LiteralExpr, Path, PathIdent, Struct, TyAstKind,
     },
     semantic::{
         ctx::{
             BuiltinType, DefId, FnSig, SemanticCtx, Ty, TypeDef, TypeId, TypedConst,
             TypedConstKind, ValueDefKind,
         },
-        visitor::{Visitor, walk_function, walk_path, walk_struct, walk_struct_field},
+        visitor::{Visitor, walk_expr, walk_function, walk_path, walk_struct, walk_struct_field},
     },
 };
 
@@ -109,6 +109,24 @@ impl Visitor for TypeResolver<'_> {
         if let Err(diag) = self.resolve_const_value(node, &TypedConstKind::Usize) {
             self.diagnostics.push(diag);
         }
+    }
+
+    fn visit_expr(&mut self, node: &Expr) {
+        if let ExprKind::Literal(literal) = &node.kind {
+            let value = match literal {
+                LiteralExpr::Int(literal) => parse_int_literal(&literal.raw),
+                LiteralExpr::Bool(value) => Some(i64::from(*value)),
+            };
+            if let Some(value) = value {
+                self.ctx.record_node_literal(node.id, value);
+            } else {
+                self.diagnostics.push(Diagnostic::new(
+                    "integer literal is invalid or out of range for i64",
+                    node.span.clone(),
+                ));
+            }
+        }
+        walk_expr(self, node);
     }
 
     fn visit_function(&mut self, node: &crate::frontend::ast::Function) {
