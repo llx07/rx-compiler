@@ -1,0 +1,32 @@
+[
+  {
+    "source": "acc-block-diverge-by-loop.rx",
+    "stage": "semantic",
+    "compilation_success": true,
+    "description": "A block without a tail expression has never type when it diverges through an infinite loop."
+  },
+  {
+    "source": "acc-block-diverge-by-return.rx",
+    "stage": "semantic",
+    "compilation_success": true,
+    "description": "A block without a tail expression has never type when it diverges through return."
+  },
+  {
+    "source": "acc-block-diverge-with-expectation.rx",
+    "stage": "semantic",
+    "compilation_success": true,
+    "description": "An expected integer type propagates through nested block tails even after return."
+  },
+  {
+    "source": "rej-block-diverge-with-incompatible-type.rx",
+    "stage": "semantic",
+    "compilation_success": false,
+    "description": "An unreachable block tail must satisfy the expected type."
+  },
+  {
+    "source": "rej-loop-must-be-unit-even-diverge.rx",
+    "stage": "semantic",
+    "compilation_success": false,
+    "description": "An unreachable loop body tail must satisfy the expected unit type."
+  }
+]
