@@ -5,6 +5,7 @@ use crate::{
         body_check::body_check,
         ctx::{BuiltinDef, BuiltinType, Namespace, SemanticCtx, TypeDef, ValueDef, ValueDefKind},
         def_collect::def_collect,
+        entry_check::entry_check,
         name_res::name_resolve,
         trait_check::trait_check,
         type_res::type_resolve,
@@ -79,6 +80,11 @@ pub fn semantic_check(ast: &Crate) -> Result<SemanticCtx, Vec<Diagnostic>> {
     }
 
     body_check(ast, &mut ctx, &mut diagnostics);
+    if !diagnostics.is_empty() {
+        return Err(diagnostics);
+    }
+
+    entry_check(&ctx, &mut diagnostics);
     if !diagnostics.is_empty() {
         return Err(diagnostics);
     }
