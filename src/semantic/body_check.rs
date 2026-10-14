@@ -109,13 +109,13 @@ impl BodyChecker<'_> {
             return_ty: expect_ty.clone(),
         });
 
-        let _ = self.check_block(&function.body, Some(expect_ty));
+        let _ = self.check_block(&function.body, Some(&expect_ty));
 
         self.current_function = None;
     }
 
     // result stands for whether diverge
-    fn check_block(&mut self, block: &BlockExpr, expected: Option<Ty>) -> Result<bool, ()> {
+    fn check_block(&mut self, block: &BlockExpr, expected: Option<&Ty>) -> Result<bool, ()> {
         let mut diverged = false;
 
         for stmt in &block.stmts {
@@ -123,7 +123,7 @@ impl BodyChecker<'_> {
                 StmtKind::Expr(expr) => {
                     diverged |= self.check_expr(
                         &expr.expr,
-                        if expr.has_semi { None } else { Some(Ty::Unit) },
+                        if expr.has_semi { None } else { Some(&Ty::Unit) },
                     )?;
                 }
                 StmtKind::Let(let_stmt) => {
@@ -149,12 +149,36 @@ impl BodyChecker<'_> {
     }
 
     // result stands whether diverge
-    fn check_let_stmt(&mut self, expr: &LetStmt) -> Result<bool, ()> {
-        todo!()
+    fn check_let_stmt(&mut self, stmt: &LetStmt) -> Result<bool, ()> {
+        let expected = stmt
+            .ty
+            .as_ref()
+            .map(|ty_node| self.ctx.node_ty(ty_node.id).expect("type is some"));
+
+        let diverged = self.check_expr(&stmt.expr, expected.cloned().as_ref())?;
+
+        let ty = self.ctx.node_value_ty(stmt.expr.id).ok_or(())?.clone();
+        self.ctx.record_node_ty(stmt.id, ty);
+
+        let Some(DefId::Local(local_id)) = self.ctx.node_def(stmt.id) else {
+            unreachable!("let binding is resolved");
+        };
+        let local_def = self.ctx.get_local(local_id);
+
+        self.ctx.record_node_place(
+            stmt.id,
+            PlaceInfo {
+                writable: local_def.is_mut,
+                mutable_access_blocked: false,
+                origin: PlaceOrigin::Existing,
+            },
+        );
+
+        Ok(diverged)
     }
 
     // result stands whether diverge
-    fn check_expr(&mut self, expr: &Expr, expected: Option<Ty>) -> Result<bool, ()> {
+    fn check_expr(&mut self, expr: &Expr, expected: Option<&Ty>) -> Result<bool, ()> {
         todo!()
     }
 

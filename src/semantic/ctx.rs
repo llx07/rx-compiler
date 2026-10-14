@@ -565,6 +565,22 @@ impl SemanticCtx {
         self.node_info.entry(node).or_default().ty = Some(value);
     }
 
+    pub fn node_place(&self, node: AstNodeId) -> Option<PlaceInfo> {
+        self.node_info
+            .get(&node)
+            .and_then(|info| info.expr.as_ref())
+            .and_then(|expr| expr.place)
+    }
+
+    pub fn record_node_place(&mut self, node: AstNodeId, place: PlaceInfo) {
+        self.node_info
+            .entry(node)
+            .or_default()
+            .expr
+            .get_or_insert_with(ExprSemantics::default)
+            .place = Some(place);
+    }
+
     pub fn record_node_adjustment(&mut self, node: AstNodeId, adjustment: UseAdjustment) {
         self.node_info
             .entry(node)
