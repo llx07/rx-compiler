@@ -1,5 +1,5 @@
 use crate::{
-    diagnostic::Diagnostic,
+    diagnostic::{Diagnostic, Span},
     frontend::ast::*,
     semantic::{ctx::*, visitor::Visitor},
 };
@@ -62,10 +62,99 @@ impl Visitor for BodyChecker<'_> {
 }
 
 impl BodyChecker<'_> {
-    fn check_function(&mut self, function: &Function) {}
+    fn coerce_node(&mut self, id: AstNodeId, expected: &Ty, span: Span) -> Result<(), ()> {
+        let Some(from) = self.ctx.node_ty(id) else {
+            self.diagnostics
+                .push(Diagnostic::new("cannot coerce a node without a type", span));
+            return Err(());
+        };
 
-    // result stands for can complete or not
-    fn check_expr(&mut self, expr: &Expr, expected: Option<&Ty>) -> Result<bool, ()> {
+        match plan_coercion(from, expected) {
+            Ok(adjustment) => {
+                self.ctx.record_node_adjustment(id, adjustment);
+                Ok(())
+            }
+            Err(message) => {
+                self.diagnostics.push(Diagnostic::new(message, span));
+                Err(())
+            }
+        }
+    }
+
+    fn check_function(&mut self, function: &Function) {
+        let def_id = self
+            .ctx
+            .node_def(function.id)
+            .expect("function is resolved");
+        let ValueDefKind::Function(fn_def) = &self
+            .ctx
+            .value_def(def_id)
+            .expect("function is resolved")
+            .kind
+        else {
+            unreachable!("function must be function");
+        };
+
+        let expect_ty = fn_def
+            .sig
+            .as_ref()
+            .expect("function signature was resolved")
+            .result
+            .clone();
+
+        debug_assert!(self.current_function.is_none());
+
+        self.current_function = Some(FunctionContext {
+            id: function.id,
+            return_ty: expect_ty.clone(),
+        });
+
+        let _ = self.check_block(&function.body, Some(expect_ty));
+
+        self.current_function = None;
+    }
+
+    // result stands for whether diverge
+    fn check_block(&mut self, block: &BlockExpr, expected: Option<Ty>) -> Result<bool, ()> {
+        let mut diverged = false;
+
+        for stmt in &block.stmts {
+            match &stmt.kind {
+                StmtKind::Expr(expr) => {
+                    diverged |= self.check_expr(
+                        &expr.expr,
+                        if expr.has_semi { None } else { Some(Ty::Unit) },
+                    )?;
+                }
+                StmtKind::Let(let_stmt) => {
+                    diverged |= self.check_let_stmt(let_stmt)?;
+                }
+            };
+        }
+
+        if let Some(tail) = &block.tail {
+            diverged |= self.check_expr(&tail, expected)?;
+            self.ctx
+                .record_node_ty(block.id, self.ctx.node_value_ty(tail.id).ok_or(())?.clone());
+        } else {
+            let ty = if diverged { Ty::Never } else { Ty::Unit };
+            self.ctx.record_node_ty(block.id, ty);
+
+            if let Some(expected_ty) = expected {
+                self.coerce_node(block.id, &expected_ty, block.span.clone())?;
+            }
+        };
+
+        Ok(diverged)
+    }
+
+    // result stands whether diverge
+    fn check_let_stmt(&mut self, expr: &LetStmt) -> Result<bool, ()> {
+        todo!()
+    }
+
+    // result stands whether diverge
+    fn check_expr(&mut self, expr: &Expr, expected: Option<Ty>) -> Result<bool, ()> {
         todo!()
     }
 
@@ -124,4 +213,56 @@ pub fn body_check(ast: &Crate, ctx: &mut SemanticCtx, diagnostics: &mut Vec<Diag
 
     checker.visit_crate(ast);
     checker.check_entry(ast);
+}
+
+fn ty_deref(ty: &Ty) -> Result<(bool, &Ty), String> {
+    match ty {
+        Ty::Ref { is_mut, inner } => Ok((*is_mut, inner.as_ref())),
+        // Box introduces no shared access; place mutability is checked separately.
+        Ty::Box(inner) => Ok((true, inner.as_ref())),
+        _ => Err(format!("expected a dereferenceable type, got {:?}", ty)),
+    }
+}
+
+fn plan_coercion(from: &Ty, to: &Ty) -> Result<UseAdjustment, String> {
+    if from == to {
+        return Ok(UseAdjustment {
+            target: to.clone(),
+            steps: Vec::new(),
+        });
+    };
+
+    if *from == Ty::Never {
+        return Ok(UseAdjustment {
+            target: to.clone(),
+            steps: vec![Adjustment::NeverTo],
+        });
+    }
+
+    if !matches!(from, Ty::Ref { .. }) || !matches!(to, Ty::Ref { .. }) {
+        return Err(format!("cannot coerce {:?} to {:?}", from, to));
+    }
+
+    let (from_mut, mut from_inner) = ty_deref(from)?;
+    let (to_mut, to_inner) = ty_deref(to)?;
+
+    let mut pass_shared = !from_mut;
+
+    let mut steps = vec![Adjustment::Deref];
+    while from_inner != to_inner {
+        let (is_mut, inner) = ty_deref(from_inner)?;
+        pass_shared |= !is_mut;
+        steps.push(Adjustment::Deref);
+        from_inner = inner;
+    }
+
+    if to_mut && pass_shared {
+        return Err(format!("cannot coerce {:?} to {:?}", from, to));
+    }
+
+    steps.push(Adjustment::Borrow { is_mut: to_mut });
+    Ok(UseAdjustment {
+        target: to.clone(),
+        steps,
+    })
 }

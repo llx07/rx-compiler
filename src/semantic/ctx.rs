@@ -387,18 +387,11 @@ pub enum PlaceOrigin {
 
 #[derive(Debug, Clone, Copy)]
 pub enum ResolvedAccess {
-    Deref(DerefKind),
+    Deref,
 
     Field { owner: TypeId, field: FieldId },
 
     Index(IndexKind),
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum DerefKind {
-    SharedRef,
-    MutableRef,
-    Box,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -415,9 +408,8 @@ pub struct UseAdjustment {
 
 #[derive(Debug, Clone)]
 pub enum Adjustment {
-    Deref(DerefKind),
+    Deref,
     Borrow { is_mut: bool },
-    Reborrow { is_mut: bool },
     MaterializeTemporary,
     NeverTo,
 }
@@ -559,8 +551,27 @@ impl SemanticCtx {
         self.node_info.get(&node).and_then(|info| info.ty.as_ref())
     }
 
+    /// Returns the adjusted value type, falling back to the node's original type.
+    pub fn node_value_ty(&self, node: AstNodeId) -> Option<&Ty> {
+        let info = self.node_info.get(&node)?;
+        info.expr
+            .as_ref()
+            .and_then(|expr| expr.adjustment.as_ref())
+            .map(|adjustment| &adjustment.target)
+            .or(info.ty.as_ref())
+    }
+
     pub fn record_node_ty(&mut self, node: AstNodeId, value: Ty) {
         self.node_info.entry(node).or_default().ty = Some(value);
+    }
+
+    pub fn record_node_adjustment(&mut self, node: AstNodeId, adjustment: UseAdjustment) {
+        self.node_info
+            .entry(node)
+            .or_default()
+            .expr
+            .get_or_insert_with(ExprSemantics::default)
+            .adjustment = Some(adjustment);
     }
 
     pub fn implements_trait(&self, ty: &Ty, tr: TraitKind) -> bool {
