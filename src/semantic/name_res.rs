@@ -304,15 +304,13 @@ impl<'a> NameResolution<'a> {
             }
         };
 
-        if name == "clone" {
-            return Ok(None);
-        }
-
         if let Some(id) = ty_def.associated_values().lookup(name) {
             Ok(Some(DefId::AssociatedValue {
                 owner: ty,
                 value: id,
             }))
+        } else if name == "clone" {
+            Ok(None)
         } else {
             Err(Diagnostic::new("name not found", mem_seg.span.clone()))
         }
