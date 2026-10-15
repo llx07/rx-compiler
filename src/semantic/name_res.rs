@@ -148,7 +148,10 @@ impl<'a> Visitor for NameResolution<'a> {
                 }
             };
 
-            if !self.ctx.value_def(def_id).is_some_and(|def| def.is_const()) {
+            if !def_id
+                .as_value_def(self.ctx)
+                .is_some_and(|def| def.is_const())
+            {
                 self.diagnostics
                     .push(Diagnostic::new("Not a const value", node.span.clone()));
                 return;

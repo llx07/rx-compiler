@@ -289,6 +289,90 @@ pub enum DefId {
     Field { owner: TypeId, field: FieldId },
 }
 
+impl DefId {
+    pub fn as_type_def(self, ctx: &SemanticCtx) -> Option<&TypeDef> {
+        match self {
+            Self::Type(id) => Some(ctx.get_type_def(id)),
+            _ => None,
+        }
+    }
+
+    pub fn as_type_def_mut(self, ctx: &mut SemanticCtx) -> Option<&mut TypeDef> {
+        match self {
+            Self::Type(id) => Some(ctx.get_type_def_mut(id)),
+            _ => None,
+        }
+    }
+
+    pub fn as_struct_def(self, ctx: &SemanticCtx) -> Option<&StructDef> {
+        match self.as_type_def(ctx)? {
+            TypeDef::Struct(def) => Some(def),
+            TypeDef::Builtin(_) => None,
+        }
+    }
+
+    pub fn as_struct_def_mut(self, ctx: &mut SemanticCtx) -> Option<&mut StructDef> {
+        match self.as_type_def_mut(ctx)? {
+            TypeDef::Struct(def) => Some(def),
+            TypeDef::Builtin(_) => None,
+        }
+    }
+
+    pub fn as_value_def(self, ctx: &SemanticCtx) -> Option<&ValueDef> {
+        match self {
+            Self::GlobalValue(value) => Some(ctx.defs.values.get(value)),
+            Self::AssociatedValue { owner, value } => {
+                Some(ctx.defs.types.get(owner).associated_values().get(value))
+            }
+            _ => None,
+        }
+    }
+
+    pub fn as_value_def_mut(self, ctx: &mut SemanticCtx) -> Option<&mut ValueDef> {
+        match self {
+            Self::GlobalValue(value) => Some(ctx.defs.values.get_mut(value)),
+            Self::AssociatedValue { owner, value } => Some(
+                ctx.defs
+                    .types
+                    .get_mut(owner)
+                    .associated_values_mut()
+                    .get_mut(value),
+            ),
+            _ => None,
+        }
+    }
+
+    pub fn as_function_def(self, ctx: &SemanticCtx) -> Option<&FunctionDef> {
+        match &self.as_value_def(ctx)?.kind {
+            ValueDefKind::Function(def) => Some(def),
+            _ => None,
+        }
+    }
+
+    pub fn as_function_def_mut(self, ctx: &mut SemanticCtx) -> Option<&mut FunctionDef> {
+        match &mut self.as_value_def_mut(ctx)?.kind {
+            ValueDefKind::Function(def) => Some(def),
+            _ => None,
+        }
+    }
+
+    /// Returns the field definition referenced by this ID, if any.
+    pub fn as_field_def(self, ctx: &SemanticCtx) -> Option<&FieldDef> {
+        let Self::Field { owner, field } = self else {
+            return None;
+        };
+        Some(Self::Type(owner).as_struct_def(ctx)?.fields.get(field))
+    }
+
+    /// Returns the local definition referenced by this ID, if any.
+    pub fn as_local_def(self, ctx: &SemanticCtx) -> Option<&LocalDef> {
+        match self {
+            Self::Local(id) => Some(ctx.get_local(id)),
+            _ => None,
+        }
+    }
+}
+
 pub struct LocalTable {
     table: Vec<LocalDef>,
 }
@@ -340,6 +424,28 @@ pub enum Ty {
     Vec(Box<Ty>),
 }
 
+impl Ty {
+    /// Returns the scalar operand type, allowing one shared-reference layer.
+    pub fn as_scalar(&self) -> Option<&Self> {
+        let ty = match self {
+            Self::Ref {
+                is_mut: false,
+                inner,
+            } => inner.as_ref(),
+            ty => ty,
+        };
+        match ty {
+            Self::I32 | Self::ISize | Self::U32 | Self::USize | Self::Bool => Some(ty),
+            _ => None,
+        }
+    }
+
+    /// Returns the integer operand type, allowing one shared-reference layer.
+    pub fn as_integer(&self) -> Option<&Self> {
+        self.as_scalar().filter(|ty| !matches!(ty, Self::Bool))
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TypedConst {
     pub kind: TypedConstKind,
@@ -378,13 +484,6 @@ pub struct ExprSemantics {
 pub struct PlaceInfo {
     pub writable: bool,
     pub mutable_access_blocked: bool,
-    pub origin: PlaceOrigin,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum PlaceOrigin {
-    Existing,
-    Temporary,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -483,30 +582,6 @@ impl SemanticCtx {
         self.defs.values.lookup(name)
     }
 
-    pub fn value_def(&self, id: DefId) -> Option<&ValueDef> {
-        match id {
-            DefId::GlobalValue(value) => Some(self.defs.values.get(value)),
-            DefId::AssociatedValue { owner, value } => {
-                Some(self.defs.types.get(owner).associated_values().get(value))
-            }
-            _ => None,
-        }
-    }
-
-    pub fn value_def_mut(&mut self, id: DefId) -> Option<&mut ValueDef> {
-        match id {
-            DefId::GlobalValue(value) => Some(self.defs.values.get_mut(value)),
-            DefId::AssociatedValue { owner, value } => Some(
-                self.defs
-                    .types
-                    .get_mut(owner)
-                    .associated_values_mut()
-                    .get_mut(value),
-            ),
-            _ => None,
-        }
-    }
-
     pub fn get_type_def(&self, id: TypeId) -> &TypeDef {
         self.defs.types.get(id)
     }
@@ -537,8 +612,14 @@ impl SemanticCtx {
         self.locals.alloc(def)
     }
 
+    /// Returns a local definition by its local ID.
     pub fn get_local(&self, id: LocalId) -> &LocalDef {
         self.locals.get(id)
+    }
+
+    /// Returns the local definition resolved by an AST node, if any.
+    pub fn node_local(&self, node: AstNodeId) -> Option<&LocalDef> {
+        self.node_def(node)?.as_local_def(self)
     }
 
     pub fn node_const(&self, node: AstNodeId) -> Option<TypedConst> {
@@ -589,6 +670,61 @@ impl SemanticCtx {
             .expr
             .get_or_insert_with(ExprSemantics::default)
             .place = Some(place);
+    }
+
+    pub fn record_node_access(&mut self, node: AstNodeId, access: ResolvedAccess) {
+        self.node_info
+            .entry(node)
+            .or_default()
+            .expr
+            .get_or_insert_with(ExprSemantics::default)
+            .access = Some(access);
+    }
+
+    pub fn node_jump(&self, node: AstNodeId) -> Option<JumpTarget> {
+        self.node_info
+            .get(&node)
+            .and_then(|info| info.expr.as_ref())
+            .and_then(|expr| expr.jump)
+    }
+
+    pub fn record_node_jump(&mut self, node: AstNodeId, jump: JumpTarget) {
+        self.node_info
+            .entry(node)
+            .or_default()
+            .expr
+            .get_or_insert_with(ExprSemantics::default)
+            .jump = Some(jump);
+    }
+
+    /// Materializes the adjusted value in writable temporary storage.
+    pub fn materialize_value(&mut self, node: AstNodeId) -> PlaceInfo {
+        debug_assert!(self.node_place(node).is_none());
+
+        let target = self
+            .node_value_ty(node)
+            .expect("materialized value has a type")
+            .clone();
+        let expr = self
+            .node_info
+            .entry(node)
+            .or_default()
+            .expr
+            .get_or_insert_with(ExprSemantics::default);
+        expr.adjustment
+            .get_or_insert_with(|| UseAdjustment {
+                target,
+                steps: Vec::new(),
+            })
+            .steps
+            .push(Adjustment::MaterializeTemporary);
+
+        let place = PlaceInfo {
+            writable: true,
+            mutable_access_blocked: false,
+        };
+        expr.place = Some(place);
+        place
     }
 
     pub fn record_node_adjustment(&mut self, node: AstNodeId, adjustment: UseAdjustment) {

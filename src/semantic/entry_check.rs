@@ -9,8 +9,8 @@ pub fn entry_check(ctx: &SemanticCtx, diagnostics: &mut Vec<Diagnostic>) {
         return;
     };
 
-    let main_def = ctx
-        .value_def(DefId::GlobalValue(main_id))
+    let main_def = DefId::GlobalValue(main_id)
+        .as_value_def(ctx)
         .expect("symbol must be collected");
 
     let ValueDefKind::Function(main_func) = &main_def.kind else {

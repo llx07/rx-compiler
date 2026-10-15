@@ -8,8 +8,7 @@ use crate::{
     },
     semantic::{
         ctx::{
-            BuiltinType, DefId, FnSig, SemanticCtx, Ty, TypeDef, TypeId, TypedConst,
-            TypedConstKind, ValueDefKind,
+            BuiltinType, DefId, FnSig, SemanticCtx, Ty, TypeDef, TypeId, TypedConst, TypedConstKind,
         },
         visitor::{Visitor, walk_expr, walk_function, walk_path, walk_struct, walk_struct_field},
     },
@@ -57,20 +56,17 @@ impl Visitor for TypeResolver<'_> {
     fn visit_struct(&mut self, node: &Struct) {
         walk_struct(self, node);
 
-        let DefId::Type(owner) = self
+        let def_id = self
             .ctx
             .node_def(node.id)
-            .expect("struct must be bound in def_collect")
-        else {
-            unreachable!("binding of struct must be type");
-        };
+            .expect("struct must be bound in def_collect");
         for field in &node.fields {
             let Some(ty) = self.ctx.node_ty(field.id).cloned() else {
                 continue;
             };
-            let TypeDef::Struct(def) = self.ctx.get_type_def_mut(owner) else {
-                unreachable!("struct definition must have struct fields");
-            };
+            let def = def_id
+                .as_struct_def_mut(self.ctx)
+                .expect("struct definition must have struct fields");
             let field_id = def
                 .fields
                 .lookup(&field.name.name)
@@ -145,30 +141,31 @@ impl Visitor for TypeResolver<'_> {
             return;
         };
 
+        for (param, ty) in node.params.iter().zip(&params) {
+            self.ctx.record_node_ty(param.id, ty.clone());
+        }
+
         let def_id = self.ctx.node_def(node.id).expect("function is collected");
         let receiver = node.receiver.as_ref().map(|receiver| {
             let DefId::AssociatedValue { owner, .. } = def_id else {
                 unreachable!("receiver must belong to an impl");
             };
             let ty = Ty::Struct(owner);
-            if receiver.is_ref {
+            let ty = if receiver.is_ref {
                 Ty::Ref {
                     is_mut: receiver.is_mut,
                     inner: Box::new(ty),
                 }
             } else {
                 ty
-            }
+            };
+            self.ctx.record_node_ty(receiver.id, ty.clone());
+            ty
         });
 
-        let ValueDefKind::Function(fn_def) = &mut self
-            .ctx
-            .value_def_mut(def_id)
-            .expect("function is a value")
-            .kind
-        else {
-            unreachable!("collected function must have a function definition");
-        };
+        let fn_def = def_id
+            .as_function_def_mut(self.ctx)
+            .expect("collected function must have a function definition");
         fn_def.sig = Some(FnSig {
             receiver,
             params,
@@ -397,9 +394,8 @@ impl<'a> TypeResolver<'a> {
                     Diagnostic::new("unresolved constant path", path.span.clone())
                 })?;
 
-                let value_def = self
-                    .ctx
-                    .value_def(def)
+                let value_def = def
+                    .as_value_def(self.ctx)
                     .ok_or_else(|| Diagnostic::new("path must be a constant", path.span.clone()))?;
                 if !value_def.is_const() {
                     return Err(Diagnostic::new(
@@ -439,7 +435,8 @@ impl<'a> TypeResolver<'a> {
         }
 
         let result = (|| {
-            let kind = match self.resolve_ty(&item.ty)? {
+            let ty = self.resolve_ty(&item.ty)?;
+            let kind = match ty {
                 Ty::I32 => TypedConstKind::I32,
                 Ty::U32 => TypedConstKind::U32,
                 Ty::ISize => TypedConstKind::Isize,
@@ -452,6 +449,7 @@ impl<'a> TypeResolver<'a> {
                     ));
                 }
             };
+            self.ctx.record_node_ty(item.id, ty);
             self.resolve_const_value(&item.value, &kind)
         })();
 

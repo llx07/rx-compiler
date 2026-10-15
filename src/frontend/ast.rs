@@ -286,7 +286,7 @@ pub struct UnaryExpr {
     pub operand: Box<Expr>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UnaryOp {
     Neg,
     Not,
@@ -302,7 +302,7 @@ pub struct BinaryExpr {
     pub rhs: Box<Expr>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BinaryOp {
     Add,
     Sub,
@@ -334,7 +334,7 @@ pub struct AssignExpr {
     pub rhs: Box<Expr>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum AssignOp {
     Assign,
     AddAssign,

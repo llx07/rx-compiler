@@ -2,11 +2,11 @@ use std::collections::{HashMap, VecDeque};
 
 use crate::diagnostic::{Diagnostic, Span};
 use crate::frontend::ast::{Crate, ItemKind, TraitKind};
-use crate::semantic::ctx::{DefId, SemanticCtx, Ty, TypeDef, TypeId};
+use crate::semantic::ctx::{DefId, SemanticCtx, Ty, TypeId};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 struct TraitCheckNode {
-    type_id: TypeId,
+    def_id: DefId,
     tr: TraitKind,
 }
 
@@ -73,9 +73,10 @@ impl<'a> TraitChecker<'a> {
     }
 
     fn unset_and_enqueue(&mut self, node: TraitCheckNode, reason: &str) {
-        let TypeDef::Struct(def) = self.ctx.get_type_def_mut(node.type_id) else {
-            unreachable!("trait graph nodes must be structs");
-        };
+        let def = node
+            .def_id
+            .as_struct_def_mut(self.ctx)
+            .expect("trait graph nodes must be structs");
         if !def.traits.contains(node.tr) {
             return;
         }
@@ -97,12 +98,13 @@ impl<'a> TraitChecker<'a> {
             let ItemKind::Struct(structure) = &item.kind else {
                 continue;
             };
-            let Some(DefId::Type(type_id)) = self.ctx.node_def(structure.id) else {
-                unreachable!("struct must be bound before trait checking");
-            };
-            let TypeDef::Struct(def) = self.ctx.get_type_def(type_id) else {
-                unreachable!("struct must have a struct definition");
-            };
+            let def_id = self
+                .ctx
+                .node_def(structure.id)
+                .expect("struct must be bound before trait checking");
+            let def = def_id
+                .as_struct_def(self.ctx)
+                .expect("struct must have a struct definition");
 
             for tr in [
                 TraitKind::Clone,
@@ -113,7 +115,7 @@ impl<'a> TraitChecker<'a> {
                 if !def.traits.contains(tr) {
                     continue;
                 }
-                let node = TraitCheckNode { type_id, tr };
+                let node = TraitCheckNode { def_id, tr };
                 let derive = structure
                     .derives
                     .iter()
@@ -132,7 +134,7 @@ impl<'a> TraitChecker<'a> {
                     if def.traits.contains(required) {
                         self.predecessor
                             .entry(TraitCheckNode {
-                                type_id,
+                                def_id,
                                 tr: required,
                             })
                             .or_default()
@@ -155,7 +157,7 @@ impl<'a> TraitChecker<'a> {
                             if self.ctx.has_derive(dependency, tr) == Some(true) {
                                 self.predecessor
                                     .entry(TraitCheckNode {
-                                        type_id: dependency,
+                                        def_id: DefId::Type(dependency),
                                         tr,
                                     })
                                     .or_default()
