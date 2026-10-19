@@ -1021,12 +1021,97 @@ impl BodyChecker<'_> {
 
     fn check_field(
         &mut self,
-        _expr: &FieldExpr,
-        _id: AstNodeId,
-        _span: &Span,
-        _expected: Option<&Ty>,
+        expr: &FieldExpr,
+        id: AstNodeId,
+        span: &Span,
+        expected: Option<&Ty>,
     ) -> Result<bool, ()> {
-        todo!()
+        let diverged = self.check_expr(&expr.base, None)?;
+        let mut node_ty = self
+            .ctx
+            .node_value_ty(expr.base.id)
+            .expect("type resolved")
+            .clone();
+        let mut steps = Vec::new();
+        let mut base_place = self.ctx.node_place(expr.base.id).unwrap_or_else(|| {
+            steps.push(Adjustment::MaterializeTemporary);
+            self.ctx.materialize_value(expr.base.id)
+        });
+
+        let base_ty_id = loop {
+            match node_ty {
+                Ty::Struct(type_id) => break type_id,
+                Ty::Ref { is_mut, inner } => {
+                    base_place.mutable_access_blocked |= !is_mut;
+                    base_place.writable = is_mut && !base_place.mutable_access_blocked;
+                    node_ty = *inner;
+                    steps.push(Adjustment::Deref);
+                }
+                Ty::Box(inner) => {
+                    node_ty = *inner;
+                    steps.push(Adjustment::Deref);
+                }
+                _ => {
+                    self.diagnostics.push(Diagnostic::new(
+                        format!("cannot access a field on {:?}", node_ty),
+                        expr.base.span.clone(),
+                    ));
+                    return Err(());
+                }
+            }
+        };
+
+        let struct_def = DefId::Type(base_ty_id)
+            .as_struct_def(self.ctx)
+            .expect("struct must have struct def");
+
+        let member = &expr.field.name;
+
+        let Some(field_id) = struct_def.fields.lookup(member) else {
+            self.diagnostics.push(Diagnostic::new(
+                format!("unknown field {}", member),
+                expr.field.span.clone(),
+            ));
+            return Err(());
+        };
+
+        let field_ty = struct_def
+            .fields
+            .get(field_id)
+            .ty
+            .clone()
+            .expect("struct field type is resolved");
+
+        self.ctx.record_node_ty(id, field_ty);
+        self.ctx.record_node_adjustment(
+            expr.base.id,
+            UseAdjustment {
+                target: Ty::Struct(base_ty_id),
+                steps,
+            },
+        );
+
+        self.ctx.record_node_place(id, base_place);
+        self.ctx.record_node_def(
+            id,
+            DefId::Field {
+                owner: base_ty_id,
+                field: field_id,
+            },
+        );
+        self.ctx.record_node_access(
+            id,
+            ResolvedAccess::Field {
+                owner: base_ty_id,
+                field: field_id,
+            },
+        );
+
+        if let Some(expected) = expected {
+            self.coerce_node(id, expected, span.clone())?;
+        }
+
+        Ok(diverged)
     }
 
     fn check_loop(
