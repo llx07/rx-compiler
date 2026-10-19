@@ -1199,12 +1199,62 @@ impl BodyChecker<'_> {
 
     fn check_if(
         &mut self,
-        _expr: &IfExpr,
-        _id: AstNodeId,
-        _span: &Span,
-        _expected: Option<&Ty>,
+        expr: &IfExpr,
+        id: AstNodeId,
+        span: &Span,
+        expected: Option<&Ty>,
     ) -> Result<bool, ()> {
-        todo!()
+        let condition_diverged = self.check_expr(&expr.condition, Some(&Ty::Bool))?;
+
+        let mut arm_diverged = self.check_expr(
+            &expr.then_branch,
+            if expr.else_branch.is_some() {
+                expected
+            } else {
+                Some(&Ty::Unit)
+            },
+        )?;
+        if let Some(else_branch) = &expr.else_branch {
+            arm_diverged &= self.check_expr(else_branch, expected)?;
+        } else {
+            arm_diverged = false;
+        };
+
+        let ty = if expr.else_branch.is_none() {
+            Ty::Unit
+        } else if let Some(expected) = expected {
+            expected.clone()
+        } else {
+            if let Some(ty) = lub_coerce(vec![
+                self.ctx
+                    .node_value_ty(expr.then_branch.id)
+                    .expect("type is resolved"),
+                self.ctx
+                    .node_value_ty(expr.else_branch.as_ref().unwrap().id)
+                    .expect("type is resolved"),
+            ]) {
+                self.coerce_node(expr.then_branch.id, &ty, expr.then_branch.span.clone())?;
+                self.coerce_node(
+                    expr.else_branch.as_ref().unwrap().id,
+                    &ty,
+                    expr.else_branch.as_ref().unwrap().span.clone(),
+                )?;
+                ty
+            } else {
+                self.diagnostics.push(Diagnostic::new(
+                    "incompatible type for if arms",
+                    span.clone(),
+                ));
+                return Err(());
+            }
+        };
+
+        self.ctx.record_node_ty(id, ty);
+        if let Some(expected) = expected {
+            self.coerce_node(id, expected, span.clone())?;
+        }
+
+        Ok(condition_diverged || arm_diverged)
     }
 
     fn check_return(

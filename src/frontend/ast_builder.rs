@@ -5,7 +5,7 @@ use crate::{
     frontend::ast::{
         ArrayExpr, ArrayTy, AssignExpr, AssignOp, AssociatedItem, AssociatedItemKind, AstNodeId,
         BinaryExpr, BinaryOp, Binding, BlockExpr, CallExpr, CastExpr, ConstItem, ConstValue,
-        ConstValueKind, Crate, Derive, TraitKind, ElseBranch, Expr, ExprKind, ExprStmt, FieldExpr,
+        ConstValueKind, Crate, Derive, TraitKind, Expr, ExprKind, ExprStmt, FieldExpr,
         Function, Ident, IfExpr, Impl, IndexExpr, IntLiteral, IntSuffix, Item, ItemKind, LetStmt,
         LiteralExpr, LoopExpr, MethodCallExpr, Param, Path, PathIdent, PathSegment, Receiver,
         RefTy, Stmt, StmtKind, Struct, StructExpr, StructExprField, StructField, TyAst, TyAstKind,
@@ -1086,15 +1086,15 @@ impl AstBuilder {
                 match rule.rule_index() {
                     RULE_CONDITION_EXPRESSION => condition = Some(self.build_expr(child)?),
                     RULE_BLOCK_EXPRESSION => {
-                        let block = self.build_block_expr(child)?;
+                        let block = Box::new(self.build_expr(child)?);
                         if then_branch.is_none() {
                             then_branch = Some(block);
                         } else {
-                            else_branch = Some(ElseBranch::BlockExpr(block));
+                            else_branch = Some(block);
                         }
                     }
                     RULE_IF_EXPRESSION => {
-                        else_branch = Some(ElseBranch::IfExpr(Box::new(self.build_expr(child)?)));
+                        else_branch = Some(Box::new(self.build_expr(child)?));
                     }
                     _ => {}
                 }

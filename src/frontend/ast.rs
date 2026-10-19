@@ -413,12 +413,6 @@ pub enum LoopExpr {
 #[derive(Debug)]
 pub struct IfExpr {
     pub condition: Box<Expr>,
-    pub then_branch: BlockExpr,
-    pub else_branch: Option<ElseBranch>,
-}
-
-#[derive(Debug)]
-pub enum ElseBranch {
-    BlockExpr(BlockExpr),
-    IfExpr(Box<Expr>),
+    pub then_branch: Box<Expr>,
+    pub else_branch: Option<Box<Expr>>,
 }

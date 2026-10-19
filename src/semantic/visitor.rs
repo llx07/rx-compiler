@@ -1,6 +1,6 @@
 use crate::frontend::ast::{
     ArrayExpr, AssociatedItem, AssociatedItemKind, BlockExpr, ConstItem, ConstValue,
-    ConstValueKind, Crate, ElseBranch, Expr, ExprKind, ExprStmt, Function, Impl, Item, ItemKind,
+    ConstValueKind, Crate, Expr, ExprKind, ExprStmt, Function, Impl, Item, ItemKind,
     LetStmt, LoopExpr, Param, Path, PathSegment, Stmt, StmtKind, Struct, StructExprField,
     StructField, TyAst, TyAstKind,
 };
@@ -271,12 +271,9 @@ pub fn walk_expr<V: Visitor + ?Sized>(v: &mut V, expr: &Expr) {
         }
         ExprKind::If(if_expr) => {
             v.visit_expr(&if_expr.condition);
-            v.visit_block(&if_expr.then_branch);
+            v.visit_expr(&if_expr.then_branch);
             if let Some(branch) = &if_expr.else_branch {
-                match branch {
-                    ElseBranch::BlockExpr(block) => v.visit_block(block),
-                    ElseBranch::IfExpr(expr) => v.visit_expr(expr),
-                }
+                v.visit_expr(branch);
             }
         }
     }
