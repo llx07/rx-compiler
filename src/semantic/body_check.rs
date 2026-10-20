@@ -1141,14 +1141,156 @@ impl BodyChecker<'_> {
         })
     }
 
+    fn lookup_method(&self, receiver: &Ty, name: &str) -> Option<ResolvedCall> {
+        let owner = match receiver {
+            Ty::Ref { inner, .. } => inner.as_ref(),
+            ty => ty,
+        };
+
+        if let Ty::Struct(owner_id) = owner {
+            let members = self.ctx.get_type_def(*owner_id).associated_values();
+            if let Some(value) = members.lookup(name) {
+                let def = DefId::AssociatedValue {
+                    owner: *owner_id,
+                    value,
+                };
+                if let Some(function) = def.as_function_def(self.ctx) {
+                    let sig = function.sig.as_ref().expect("method signature is resolved");
+                    if sig.receiver.as_ref() == Some(receiver) {
+                        return Some(ResolvedCall {
+                            target: CallTarget::User(def),
+                            sig: sig.clone(),
+                        });
+                    }
+                }
+            }
+        }
+
+        self.lookup_builtin_call(Some(owner), name)
+            .filter(|call| call.sig.receiver.as_ref() == Some(receiver))
+    }
+
     fn check_method_call(
         &mut self,
-        _expr: &MethodCallExpr,
-        _id: AstNodeId,
-        _span: &Span,
-        _expected: Option<&Ty>,
+        expr: &MethodCallExpr,
+        id: AstNodeId,
+        span: &Span,
+        expected: Option<&Ty>,
     ) -> Result<bool, ()> {
-        todo!()
+        let PathIdent::Ident(name) = &expr.method.name else {
+            self.diagnostics.push(Diagnostic::new(
+                "invalid method name",
+                expr.method.span.clone(),
+            ));
+            return Err(());
+        };
+
+        let mut diverged = self.check_expr(&expr.receiver, None)?;
+        let mut receiver_ty = self
+            .ctx
+            .node_value_ty(expr.receiver.id)
+            .expect("receiver type is resolved")
+            .clone();
+        let mut place = self.ctx.node_place(expr.receiver.id).unwrap_or(PlaceInfo {
+            writable: true,
+            mutable_access_blocked: false,
+        });
+        let mut steps = Vec::new();
+
+        let mut selected = 'lookup: loop {
+            // Search T, &T, &mut T before dereferencing to the next type.
+            for borrow in [None, Some(false), Some(true)] {
+                let target = match borrow {
+                    None => receiver_ty.clone(),
+                    Some(is_mut) => Ty::Ref {
+                        is_mut,
+                        inner: Box::new(receiver_ty.clone()),
+                    },
+                };
+                let Some(call) = self.lookup_method(&target, &name.name) else {
+                    continue;
+                };
+
+                // Mutability is checked only after selecting a method.
+                let mutable_receiver = matches!(&target, Ty::Ref { is_mut: true, .. });
+                if mutable_receiver
+                    && (place.mutable_access_blocked || (borrow == Some(true) && !place.writable))
+                {
+                    self.diagnostics.push(Diagnostic::new(
+                        "cannot mutably borrow an immutable receiver",
+                        expr.receiver.span.clone(),
+                    ));
+                    return Err(());
+                }
+
+                if let Some(is_mut) = borrow {
+                    steps.push(Adjustment::Borrow { is_mut });
+                }
+                break 'lookup MethodCandidate {
+                    call,
+                    receiver_adjustment: UseAdjustment { target, steps },
+                };
+            }
+
+            match receiver_ty {
+                Ty::Ref { is_mut, inner } => {
+                    place.mutable_access_blocked |= !is_mut;
+                    place.writable = is_mut && !place.mutable_access_blocked;
+                    receiver_ty = *inner;
+                }
+                Ty::Box(inner) => receiver_ty = *inner,
+                _ => {
+                    self.diagnostics.push(Diagnostic::new(
+                        format!("no matching method {}", name.name),
+                        expr.method.span.clone(),
+                    ));
+                    return Err(());
+                }
+            }
+            steps.push(Adjustment::Deref);
+        };
+
+        if self.ctx.node_place(expr.receiver.id).is_none()
+            && matches!(
+                selected.receiver_adjustment.steps.as_slice(),
+                [Adjustment::Borrow { .. }]
+            )
+        {
+            self.ctx.materialize_value(expr.receiver.id);
+            let mut steps = self
+                .ctx
+                .node_adjustment(expr.receiver.id)
+                .expect("materialized receiver has an adjustment")
+                .steps
+                .clone();
+            steps.append(&mut selected.receiver_adjustment.steps);
+            selected.receiver_adjustment.steps = steps;
+        }
+        self.ctx
+            .record_node_adjustment(expr.receiver.id, selected.receiver_adjustment);
+
+        let call = selected.call;
+        if expr.args.len() != call.sig.params.len() {
+            self.diagnostics.push(Diagnostic::new(
+                format!(
+                    "expected {} argument(s), found {}",
+                    call.sig.params.len(),
+                    expr.args.len()
+                ),
+                span.clone(),
+            ));
+            return Err(());
+        }
+        for (arg, param) in expr.args.iter().zip(&call.sig.params) {
+            diverged |= self.check_expr(arg, Some(param))?;
+        }
+
+        self.ctx.record_node_ty(id, call.sig.result.clone());
+        self.ctx.record_node_call(id, call);
+        if let Some(expected) = expected {
+            self.coerce_node(id, expected, span.clone())?;
+        }
+        Ok(diverged)
     }
 
     fn check_field(
