@@ -42,4 +42,4 @@ jobs:
           rustup default 1.95.0
 
       - name: Run tests
-        run: make test
+        run: make test CLANG=clang-22
