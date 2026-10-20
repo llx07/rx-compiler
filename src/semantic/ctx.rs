@@ -743,6 +743,13 @@ impl SemanticCtx {
         place
     }
 
+    pub fn node_adjustment(&self, node: AstNodeId) -> Option<&UseAdjustment> {
+        self.node_info
+            .get(&node)
+            .and_then(|info| info.expr.as_ref())
+            .and_then(|expr| expr.adjustment.as_ref())
+    }
+
     pub fn record_node_adjustment(&mut self, node: AstNodeId, adjustment: UseAdjustment) {
         self.node_info
             .entry(node)

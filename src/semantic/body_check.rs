@@ -561,60 +561,16 @@ impl BodyChecker<'_> {
                 self.ctx.record_node_ty(id, Ty::Bool);
             }
             BinaryOp::Le | BinaryOp::Lt | BinaryOp::Ge | BinaryOp::Gt => {
-                if lhs_ty.as_scalar().is_none() {
-                    self.diagnostics.push(Diagnostic::new(
-                        format!("expected an integer or bool type, found {:?}", lhs_ty),
-                        expr.lhs.span.clone(),
-                    ));
-                    return Err(());
-                }
-                if rhs_ty.as_scalar().is_none() {
-                    self.diagnostics.push(Diagnostic::new(
-                        format!("expected an integer or bool type, found {:?}", rhs_ty),
-                        expr.rhs.span.clone(),
-                    ));
-                    return Err(());
-                }
-                if lhs_ty.as_scalar() != rhs_ty.as_integer() {
-                    self.diagnostics.push(Diagnostic::new(
-                        format!("cannot compare between {:?} and {:?}", lhs_ty, rhs_ty),
-                        span.clone(),
-                    ));
-                    return Err(());
-                }
-
-                if lhs_ty != rhs_ty {
-                    // the only exception: &T < &mut T
-                    let Ty::Ref {
-                        is_mut: lhs_is_mut,
-                        inner: lhs_inner,
-                    } = lhs_ty
-                    else {
-                        self.diagnostics.push(Diagnostic::new(
-                            format!("cannot compare between {:?} and {:?}", lhs_ty, rhs_ty),
-                            span.clone(),
-                        ));
-                        return Err(());
-                    };
-                    let Ty::Ref {
-                        is_mut: rhs_is_mut,
-                        inner: rhs_inner,
-                    } = rhs_ty
-                    else {
-                        self.diagnostics.push(Diagnostic::new(
-                            format!("cannot compare between {:?} and {:?}", lhs_ty, rhs_ty),
-                            span.clone(),
-                        ));
-                        return Err(());
-                    };
-
-                    if *lhs_is_mut || !rhs_is_mut || lhs_inner != rhs_inner {
-                        self.diagnostics.push(Diagnostic::new(
-                            format!("cannot compare between {:?} and {:?}", lhs_ty, rhs_ty),
-                            span.clone(),
-                        ));
+                let adjustment = match plan_ordering(lhs_ty, rhs_ty) {
+                    Ok(adjustment) => adjustment,
+                    Err(message) => {
+                        self.diagnostics
+                            .push(Diagnostic::new(message, span.clone()));
                         return Err(());
                     }
+                };
+                if let Some(adjustment) = adjustment {
+                    self.ctx.record_node_adjustment(expr.rhs.id, adjustment);
                 }
 
                 self.ctx.record_node_ty(id, Ty::Bool);
@@ -1561,6 +1517,38 @@ pub fn body_check(ast: &Crate, ctx: &mut SemanticCtx, diagnostics: &mut Vec<Diag
     };
 
     checker.visit_crate(ast);
+}
+
+/// Ordering preserves reference shape, except for an outer &mut T on the right
+/// becoming &T. General coercions would also allow unsupported deref coercions.
+fn plan_ordering(lhs: &Ty, rhs: &Ty) -> Result<Option<UseAdjustment>, String> {
+    let mut scalar = lhs;
+    while let Ty::Ref { inner, .. } = scalar {
+        scalar = inner;
+    }
+    if matches!(scalar, Ty::I32 | Ty::U32 | Ty::ISize | Ty::USize | Ty::Bool) {
+        if lhs == rhs {
+            return Ok(None);
+        }
+        if let (
+            Ty::Ref {
+                is_mut: false,
+                inner: lhs_inner,
+            },
+            Ty::Ref {
+                is_mut: true,
+                inner: rhs_inner,
+            },
+        ) = (lhs, rhs)
+            && lhs_inner == rhs_inner
+        {
+            return Ok(Some(UseAdjustment {
+                target: lhs.clone(),
+                steps: vec![Adjustment::Deref, Adjustment::Borrow { is_mut: false }],
+            }));
+        }
+    }
+    Err(format!("cannot compare between {:?} and {:?}", lhs, rhs))
 }
 
 fn lub_coerce(types: Vec<&Ty>) -> Option<Ty> {
