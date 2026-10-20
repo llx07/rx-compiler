@@ -87,6 +87,12 @@ impl<'a> Visitor for DefCollector<'a> {
 
         let mut traits = TraitSet::new();
         for derive in &node.derives {
+            if traits.contains(derive.kind) {
+                self.diagnostics.push(Diagnostic::new(
+                    format!("Duplicate derive {:?} for struct '{name}'", derive.kind),
+                    derive.span.clone(),
+                ));
+            }
             traits.set(derive.kind);
         }
 
