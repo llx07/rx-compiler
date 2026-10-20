@@ -237,7 +237,7 @@ impl<'a> NameResolution<'a> {
         }
     }
 
-    fn resolve_expr_path(&self, path: &Path) -> Result<Option<DefId>, Diagnostic> {
+    fn resolve_expr_path(&mut self, path: &Path) -> Result<Option<DefId>, Diagnostic> {
         match path.segments.as_slice() {
             [segment] => self.resolve_unqualified_value(segment),
 
@@ -288,13 +288,14 @@ impl<'a> NameResolution<'a> {
     }
 
     fn resolve_associated_value(
-        &self,
+        &mut self,
         ty_seg: &PathSegment,
         mem_seg: &PathSegment,
     ) -> Result<Option<DefId>, Diagnostic> {
         let DefId::Type(ty) = self.resolve_type_segment(ty_seg)? else {
             unreachable!("must be type");
         };
+        self.ctx.record_node_def(ty_seg.id, DefId::Type(ty));
 
         let ty_def = self.ctx.get_type_def(ty);
         let name = match &mem_seg.name {

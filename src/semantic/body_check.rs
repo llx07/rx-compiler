@@ -1001,12 +1001,188 @@ impl BodyChecker<'_> {
 
     fn check_call(
         &mut self,
-        _expr: &CallExpr,
-        _id: AstNodeId,
-        _span: &Span,
-        _expected: Option<&Ty>,
+        expr: &CallExpr,
+        id: AstNodeId,
+        span: &Span,
+        expected: Option<&Ty>,
     ) -> Result<bool, ()> {
-        todo!()
+        let callee = &expr.callee;
+        let not_callable = || Diagnostic::new("invalid call", callee.span.clone());
+        let ExprKind::Path(path) = &callee.kind else {
+            self.diagnostics.push(not_callable());
+            return Err(());
+        };
+
+        let def_id = self.ctx.node_def(callee.id);
+        let call = if let Some(function) = def_id.and_then(|id| id.as_function_def(self.ctx)) {
+            ResolvedCall {
+                target: CallTarget::User(def_id.expect("function is resolved")),
+                sig: function
+                    .sig
+                    .clone()
+                    .expect("function signature is resolved"),
+            }
+        } else {
+            // builtin function / clone
+            if def_id.is_some_and(|id: DefId| {
+                !id.as_value_def(self.ctx)
+                    .is_some_and(|value| value.kind == ValueDefKind::BuiltinFunction)
+            }) {
+                self.diagnostics.push(not_callable());
+                return Err(());
+            }
+
+            let (owner_ty, name) = match path.segments.as_slice() {
+                [segment] => {
+                    let PathIdent::Ident(name) = &segment.name else {
+                        self.diagnostics.push(not_callable());
+                        return Err(());
+                    };
+                    (None, name.name.as_str())
+                }
+                [owner, member] => {
+                    let owner_id = match self.ctx.node_def(owner.id) {
+                        Some(DefId::Type(owner)) => owner,
+                        _ => unreachable!("associated owner type is resolved"),
+                    };
+                    let type_arg = owner.generic_args.first().map(|arg| {
+                        self.ctx
+                            .node_ty(arg.id)
+                            .expect("type argument is resolved")
+                            .clone()
+                    });
+                    let owner_ty = match self.ctx.get_type_def(owner_id) {
+                        TypeDef::Struct(_) => Ty::Struct(owner_id),
+                        TypeDef::Builtin(def) => match def.kind {
+                            BuiltinType::I32 => Ty::I32,
+                            BuiltinType::U32 => Ty::U32,
+                            BuiltinType::ISize => Ty::ISize,
+                            BuiltinType::USize => Ty::USize,
+                            BuiltinType::Bool => Ty::Bool,
+                            BuiltinType::Box => Ty::Box(Box::new(
+                                type_arg.clone().expect("Box has a type argument"),
+                            )),
+                            BuiltinType::Vec => Ty::Vec(Box::new(
+                                type_arg.clone().expect("Vec has a type argument"),
+                            )),
+                        },
+                    };
+                    let PathIdent::Ident(name) = &member.name else {
+                        self.diagnostics.push(not_callable());
+                        return Err(());
+                    };
+                    (Some(owner_ty), name.name.as_str())
+                }
+                _ => {
+                    self.diagnostics.push(not_callable());
+                    return Err(());
+                }
+            };
+
+            self.lookup_builtin_call(owner_ty.as_ref(), name)
+                .ok_or_else(|| {
+                    self.diagnostics.push(not_callable());
+                })?
+        };
+
+        // Explicit associated calls pass the receiver as an ordinary argument.
+        let params = call.sig.receiver.iter().chain(&call.sig.params);
+        let param_count = params.clone().count();
+        if expr.args.len() != param_count {
+            self.diagnostics.push(Diagnostic::new(
+                format!(
+                    "expected {param_count} argument(s), found {}",
+                    expr.args.len()
+                ),
+                span.clone(),
+            ));
+            return Err(());
+        }
+
+        let mut diverged = false;
+        for (arg, param) in expr.args.iter().zip(params) {
+            diverged |= self.check_expr(arg, Some(param))?;
+        }
+
+        self.ctx.record_node_ty(id, call.sig.result.clone());
+        self.ctx.record_node_call(id, call);
+        if let Some(expected) = expected {
+            self.coerce_node(id, expected, span.clone())?;
+        }
+        Ok(diverged)
+    }
+
+    fn lookup_builtin_call(&self, owner: Option<&Ty>, name: &str) -> Option<ResolvedCall> {
+        let reference = |ty: &Ty, is_mut| Ty::Ref {
+            is_mut,
+            inner: Box::new(ty.clone()),
+        };
+        let (op, type_arg, receiver, params, result) = match (owner, name) {
+            (None, "get_i32") => (BuiltinOp::GetI32, None, None, vec![], Ty::I32),
+            (None, "print_i32") => (BuiltinOp::PrintI32, None, None, vec![Ty::I32], Ty::Unit),
+            (None, "println_i32") => (BuiltinOp::PrintlnI32, None, None, vec![Ty::I32], Ty::Unit),
+            (Some(ty), "clone") if self.ctx.implements_trait(ty, TraitKind::Clone) => (
+                BuiltinOp::Clone,
+                Some(ty.clone()),
+                Some(reference(ty, false)),
+                vec![],
+                ty.clone(),
+            ),
+            (Some(ty @ Ty::Array { .. }), "len") => (
+                BuiltinOp::ArrayLen,
+                Some(ty.clone()),
+                Some(reference(ty, false)),
+                vec![],
+                Ty::USize,
+            ),
+            (Some(ty @ Ty::Box(inner)), "new") => (
+                BuiltinOp::BoxNew,
+                Some(inner.as_ref().clone()),
+                None,
+                vec![inner.as_ref().clone()],
+                ty.clone(),
+            ),
+            (Some(ty @ Ty::Vec(inner)), name) => {
+                let (op, receiver, params, result) = match name {
+                    "new" => (BuiltinOp::VecNew, None, vec![], ty.clone()),
+                    "len" => (
+                        BuiltinOp::VecLen,
+                        Some(reference(ty, false)),
+                        vec![],
+                        Ty::USize,
+                    ),
+                    "is_empty" => (
+                        BuiltinOp::VecIsEmpty,
+                        Some(reference(ty, false)),
+                        vec![],
+                        Ty::Bool,
+                    ),
+                    "push" => (
+                        BuiltinOp::VecPush,
+                        Some(reference(ty, true)),
+                        vec![inner.as_ref().clone()],
+                        Ty::Unit,
+                    ),
+                    "remove" => (
+                        BuiltinOp::VecRemove,
+                        Some(reference(ty, true)),
+                        vec![Ty::USize],
+                        inner.as_ref().clone(),
+                    ),
+                    _ => return None,
+                };
+                (op, Some(inner.as_ref().clone()), receiver, params, result)
+            }
+            _ => return None,
+        };
+        Some(ResolvedCall {
+            target: CallTarget::Builtin { op, type_arg },
+            sig: FnSig {
+                receiver,
+                params,
+                result,
+            },
+        })
     }
 
     fn check_method_call(

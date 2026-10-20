@@ -524,7 +524,7 @@ pub struct ResolvedCall {
 #[derive(Debug, Clone)]
 pub enum CallTarget {
     User(DefId),
-    Builtin { op: BuiltinOp, type_args: Vec<Ty> },
+    Builtin { op: BuiltinOp, type_arg: Option<Ty> },
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -679,6 +679,22 @@ impl SemanticCtx {
             .expr
             .get_or_insert_with(ExprSemantics::default)
             .access = Some(access);
+    }
+
+    pub fn node_call(&self, node: AstNodeId) -> Option<&ResolvedCall> {
+        self.node_info
+            .get(&node)
+            .and_then(|info| info.expr.as_ref())
+            .and_then(|expr| expr.call.as_ref())
+    }
+
+    pub fn record_node_call(&mut self, node: AstNodeId, call: ResolvedCall) {
+        self.node_info
+            .entry(node)
+            .or_default()
+            .expr
+            .get_or_insert_with(ExprSemantics::default)
+            .call = Some(call);
     }
 
     pub fn node_jump(&self, node: AstNodeId) -> Option<JumpTarget> {
