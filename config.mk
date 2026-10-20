@@ -5,7 +5,7 @@
 # Write shared runtime assembly there if your IR/CODEGEN output references it.
 BUILD = cargo build --release
 
-STAGE = semantic
+CLANG = /opt/homebrew/opt/llvm@22/bin/clang
 
 # Required for semantic tests: exit 0 to accept {source}, 1 to reject it.
 SEMANTIC = ./target/release/rx-compiler --stage=semantic {source}
