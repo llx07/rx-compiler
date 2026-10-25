@@ -2,6 +2,7 @@ mod diagnostic;
 mod frontend;
 mod generated;
 mod id_alloc;
+mod ir;
 mod semantic;
 
 use std::path::{Path, PathBuf};
