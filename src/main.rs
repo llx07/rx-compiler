@@ -17,7 +17,7 @@ use antlr4_runtime::Token as _;
 use clap::{Parser, ValueEnum};
 
 use crate::generated::rx_lexer;
-use crate::semantic::semantic_check::semantic_check;
+use crate::semantic::semantic_check;
 
 #[derive(Parser)]
 
