@@ -2,11 +2,8 @@ use crate::{
     diagnostic::Diagnostic,
     frontend::ast::{AssociatedItemKind, Crate, ItemKind, PathIdent, TyAst, TyAstKind},
     semantic::{
-        ctx::{
-            DefId, FieldDef, FunctionDef, Namespace, SemanticCtx, StructDef, TraitSet, TypeDef,
-            TypeId, ValueDef, ValueDefKind,
-        },
-        visitor::Visitor,
+        DefId, FieldDef, FunctionDef, Namespace, SemanticCtx, StructDef, TraitSet, TypeDef, TypeId,
+        ValueDef, ValueDefKind, visitor::Visitor,
     },
 };
 

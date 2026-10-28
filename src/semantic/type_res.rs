@@ -7,9 +7,7 @@ use crate::{
         ExprKind, IntSuffix, ItemKind, LiteralExpr, Path, PathIdent, Struct, TyAstKind,
     },
     semantic::{
-        ctx::{
-            BuiltinType, DefId, FnSig, SemanticCtx, Ty, TypeDef, TypeId, TypedConst, TypedConstKind,
-        },
+        BuiltinType, DefId, FnSig, SemanticCtx, Ty, TypeDef, TypeId, TypedConst, TypedConstKind,
         visitor::{Visitor, walk_expr, walk_function, walk_path, walk_struct, walk_struct_field},
     },
 };

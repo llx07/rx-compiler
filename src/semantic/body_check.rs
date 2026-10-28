@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use crate::{
     diagnostic::{Diagnostic, Span},
     frontend::ast::*,
-    semantic::{ctx::*, visitor::Visitor},
+    semantic::{visitor::Visitor, *},
 };
 
 #[derive(Debug, Clone, Copy)]

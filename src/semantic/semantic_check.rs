@@ -2,13 +2,9 @@ use crate::{
     diagnostic::Diagnostic,
     frontend::ast::Crate,
     semantic::{
-        body_check::body_check,
-        ctx::{BuiltinDef, BuiltinType, Namespace, SemanticCtx, TypeDef, ValueDef, ValueDefKind},
-        def_collect::def_collect,
-        entry_check::entry_check,
-        name_res::name_resolve,
-        trait_check::trait_check,
-        type_res::type_resolve,
+        BuiltinDef, BuiltinType, Namespace, SemanticCtx, TypeDef, ValueDef, ValueDefKind,
+        body_check::body_check, def_collect::def_collect, entry_check::entry_check,
+        name_res::name_resolve, trait_check::trait_check, type_res::type_resolve,
     },
 };
 

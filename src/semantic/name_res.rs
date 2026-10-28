@@ -4,7 +4,7 @@ use crate::{
     diagnostic::Diagnostic,
     frontend::ast::{ConstValueKind, Crate, ExprKind, Path, PathIdent, PathSegment, TyAstKind},
     semantic::{
-        ctx::{DefId, LocalDef, LocalDefKind, LocalId, SemanticCtx, TypeId},
+        DefId, LocalDef, LocalDefKind, LocalId, SemanticCtx, TypeId,
         visitor::{
             Visitor, walk_block, walk_const_value, walk_expr, walk_function, walk_let_stmt,
             walk_struct, walk_ty,
@@ -96,7 +96,7 @@ impl<'a> Visitor for NameResolution<'a> {
                 ast_node_id: param.id,
                 span: param.span.clone(),
                 is_mut: param.binding.is_mut,
-                kind: super::ctx::LocalDefKind::Param,
+                kind: LocalDefKind::Param,
             });
             self.ctx.record_node_def(param.id, DefId::Local(param_id));
 
@@ -123,7 +123,7 @@ impl<'a> Visitor for NameResolution<'a> {
             ast_node_id: node.id,
             span: node.span.clone(),
             is_mut: node.binding.is_mut,
-            kind: super::ctx::LocalDefKind::Let,
+            kind: LocalDefKind::Let,
         });
         self.ctx.record_node_def(node.id, DefId::Local(let_id));
 

@@ -1,6 +1,6 @@
 use crate::{
     diagnostic::Diagnostic,
-    semantic::ctx::{DefId, SemanticCtx, Ty, ValueDefKind},
+    semantic::{DefId, SemanticCtx, Ty, ValueDefKind},
 };
 
 pub fn entry_check(ctx: &SemanticCtx, diagnostics: &mut Vec<Diagnostic>) {

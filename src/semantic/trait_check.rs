@@ -2,7 +2,7 @@ use std::collections::{HashMap, VecDeque};
 
 use crate::diagnostic::{Diagnostic, Span};
 use crate::frontend::ast::{Crate, ItemKind, TraitKind};
-use crate::semantic::ctx::{DefId, SemanticCtx, Ty, TypeId};
+use crate::semantic::{DefId, SemanticCtx, Ty, TypeId};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 struct TraitCheckNode {
