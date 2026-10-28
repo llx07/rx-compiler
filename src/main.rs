@@ -35,6 +35,7 @@ enum CompileStage {
     Lexer,
     Parser,
     Semantic,
+    Ir,
     CodeGen,
 }
 
@@ -104,6 +105,15 @@ fn main() -> Result<(), Box<dyn Error>> {
     if args.stage == CompileStage::Semantic {
         let mut output = output_writer(args.output.as_deref())?;
         writeln!(output, "{:#?}", ast)?;
+        output.flush()?;
+        return Ok(());
+    }
+
+    if args.stage == CompileStage::Ir {
+        let module = lower::lower(&ast, &ctx);
+        let text = ir::printer::emit_module(&module);
+        let mut output = output_writer(args.output.as_deref())?;
+        output.write_all(text.as_bytes())?;
         output.flush()?;
         return Ok(());
     }
