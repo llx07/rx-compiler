@@ -291,10 +291,12 @@ pub fn emit_module(module: &Module) -> String {
 
     for (index, structure) in module.structs.iter().enumerate() {
         emit_struct(&mut text, StructId(index as u32), structure);
+        writeln!(text).unwrap();
     }
 
     for function in &module.functions {
         emit_function(&mut text, module, function);
+        writeln!(text).unwrap();
     }
 
     text
