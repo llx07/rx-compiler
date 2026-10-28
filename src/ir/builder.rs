@@ -5,17 +5,21 @@ use super::{
     IntPredicate, IrTy, Module, Operand, Signature, StructDef, StructId, Terminator,
 };
 
-pub struct ModuleBuilder {
+pub struct Builder {
     module: Module,
+    current_function: Option<FunctionId>,
+    current_block_id: Option<BlockId>,
 }
 
-impl ModuleBuilder {
+impl Builder {
     pub fn new() -> Self {
         Self {
             module: Module {
                 structs: Vec::new(),
                 functions: Vec::new(),
             },
+            current_function: None,
+            current_block_id: None,
         }
     }
 
@@ -39,39 +43,27 @@ impl ModuleBuilder {
         id
     }
 
-    pub fn define_function(&mut self, id: FunctionId) -> FunctionBuilder<'_> {
+    pub fn define_function(&mut self, id: FunctionId) {
         self.module.functions[id.0 as usize].body = Some(FunctionBody {
             instructions: Vec::new(),
             blocks: Vec::new(),
         });
-        FunctionBuilder {
-            module: &mut self.module,
-            function: id,
-            current_block_id: None,
-        }
+        self.current_function = Some(id);
+        self.current_block_id = None;
     }
 
     pub fn finish(self) -> Module {
         self.module
     }
-}
-
-pub struct FunctionBuilder<'a> {
-    module: &'a mut Module,
-    function: FunctionId,
-    current_block_id: Option<BlockId>,
-}
-
-impl FunctionBuilder<'_> {
     fn body(&self) -> &FunctionBody {
-        self.module.functions[self.function.0 as usize]
+        self.module.functions[self.current_function.expect("no function selected").0 as usize]
             .body
             .as_ref()
             .expect("function builder must have a body")
     }
 
     fn body_mut(&mut self) -> &mut FunctionBody {
-        self.module.functions[self.function.0 as usize]
+        self.module.functions[self.current_function.expect("no function selected").0 as usize]
             .body
             .as_mut()
             .expect("function builder must have a body")
@@ -110,6 +102,15 @@ impl FunctionBuilder<'_> {
 
     pub fn alloca(&mut self, ty: IrTy, align: u32) -> Operand {
         Operand::Instruction(self.append_instruction(Instruction::Alloca { ty, align }))
+    }
+
+    pub fn alloca_in_entry(&mut self, ty: IrTy, align: u32) -> Operand {
+        let body = self.body_mut();
+        let entry = body.blocks.first_mut().expect("entry block must exist");
+        let id = InstId(body.instructions.len() as u32);
+        body.instructions.push(Instruction::Alloca { ty, align });
+        entry.instructions.insert(0, id);
+        Operand::Instruction(id)
     }
 
     pub fn load(&mut self, ty: IrTy, ptr: Operand, align: u32) -> Operand {
@@ -162,6 +163,7 @@ impl FunctionBuilder<'_> {
             .blocks
             .get_mut(block_id.0 as usize)
             .expect("insertion block must exist");
+        debug_assert!(block.terminator.is_none(), "block is already terminated");
         block.terminator = Some(terminator);
     }
 }

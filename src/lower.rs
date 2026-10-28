@@ -6,13 +6,14 @@ use std::collections::HashMap;
 
 use crate::{
     frontend::ast,
-    ir::{self, FunctionId, StructId, builder::ModuleBuilder},
-    semantic::{DefId, SemanticCtx, TypeId},
+    ir::{self, FunctionId, StructId, builder::Builder},
+    semantic::{DefId, LocalId, SemanticCtx, TypeId},
 };
 
 struct IrLowerer<'a> {
     semantic: &'a SemanticCtx,
-    module: ModuleBuilder,
+    builder: Builder,
+    locals: HashMap<LocalId, function::Place>,
     structs: HashMap<TypeId, StructId>,
     functions: HashMap<DefId, FunctionId>,
     vec_struct: Option<StructId>,
@@ -59,14 +60,15 @@ impl IrLowerer<'_> {
 
         self.wrap_main();
 
-        self.module.finish()
+        self.builder.finish()
     }
 }
 
 pub fn lower(krate: &ast::Crate, semantic: &SemanticCtx) -> ir::Module {
     IrLowerer {
         semantic,
-        module: ModuleBuilder::new(),
+        builder: Builder::new(),
+        locals: HashMap::new(),
         structs: HashMap::new(),
         functions: HashMap::new(),
         vec_struct: None,

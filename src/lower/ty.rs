@@ -6,23 +6,32 @@ use crate::{
 use super::IrLowerer;
 
 impl IrLowerer<'_> {
-    pub(super) fn declare_types(&mut self) -> Vec<TypeId> {
-        let mut type_ids = Vec::new();
-        for (type_id, def) in self.semantic.iter_types() {
-            if let TypeDef::Struct(structure) = def {
-                let id = self.module.declare_struct(structure.name.clone());
-                self.structs.insert(type_id, id);
-                type_ids.push(type_id);
-            } else if let TypeDef::Builtin(builtin) = def {
-                if builtin.kind == BuiltinType::Vec {
-                    let id = self.module.declare_struct("__rx_vec".into());
-                    self.module
-                        .define_struct(id, vec![IrTy::Ptr, IrTy::I32, IrTy::I32]);
-                    self.vec_struct = Some(id);
-                }
+    /// Returns the natural storage alignment in bytes for RV32.
+    pub(super) fn align_of(&self, ty: &Ty) -> u32 {
+        match ty {
+            Ty::Bool | Ty::Unit | Ty::Never => 1,
+            Ty::I32
+            | Ty::U32
+            | Ty::ISize
+            | Ty::USize
+            | Ty::Ref { .. }
+            | Ty::Box(_)
+            | Ty::Vec(_) => 4,
+            Ty::Array { elem, .. } => self.align_of(elem),
+            Ty::Struct(type_id) => {
+                let TypeDef::Struct(structure) = self.semantic.get_type_def(*type_id) else {
+                    unreachable!("struct type must refer to a struct definition")
+                };
+                structure
+                    .fields
+                    .iter()
+                    .map(|(_, field)| {
+                        self.align_of(field.ty.as_ref().expect("field type must be resolved"))
+                    })
+                    .max()
+                    .unwrap_or(1)
             }
         }
-        type_ids
     }
 
     pub(super) fn lower_ty(&self, ty: Ty) -> IrTy {
@@ -40,6 +49,24 @@ impl IrLowerer<'_> {
                 len: len as u32,
             },
         }
+    }
+    pub(super) fn declare_types(&mut self) -> Vec<TypeId> {
+        let mut type_ids = Vec::new();
+        for (type_id, def) in self.semantic.iter_types() {
+            if let TypeDef::Struct(structure) = def {
+                let id = self.builder.declare_struct(structure.name.clone());
+                self.structs.insert(type_id, id);
+                type_ids.push(type_id);
+            } else if let TypeDef::Builtin(builtin) = def {
+                if builtin.kind == BuiltinType::Vec {
+                    let id = self.builder.declare_struct("__rx_vec".into());
+                    self.builder
+                        .define_struct(id, vec![IrTy::Ptr, IrTy::I32, IrTy::I32]);
+                    self.vec_struct = Some(id);
+                }
+            }
+        }
+        type_ids
     }
 
     pub(super) fn lower_struct(&mut self, type_id: TypeId) {
@@ -67,6 +94,6 @@ impl IrLowerer<'_> {
             .get(&type_id)
             .expect("struct should be defined");
 
-        self.module.define_struct(*struct_id, fields);
+        self.builder.define_struct(*struct_id, fields);
     }
 }
