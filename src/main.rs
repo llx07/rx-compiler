@@ -3,6 +3,7 @@ mod frontend;
 mod generated;
 mod id_alloc;
 mod ir;
+mod lower;
 mod semantic;
 
 use std::path::{Path, PathBuf};
