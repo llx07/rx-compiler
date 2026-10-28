@@ -2,15 +2,19 @@ mod body_check;
 mod def_collect;
 mod entry_check;
 mod name_res;
-pub mod semantic_check;
 mod trait_check;
 mod type_res;
 mod visitor;
 
 use std::collections::{HashMap, hash_map::Entry};
 
-use crate::diagnostic::Span;
-use crate::frontend::ast::{AstNodeId, TraitKind};
+use crate::diagnostic::{Diagnostic, Span};
+use crate::frontend::ast::{AstNodeId, Crate, TraitKind};
+
+use self::{
+    body_check::body_check, def_collect::def_collect, entry_check::entry_check,
+    name_res::name_resolve, trait_check::trait_check, type_res::type_resolve,
+};
 
 /// IDs are local to this namespace and must be queried through the same instance.
 #[derive(Debug)]
@@ -794,4 +798,84 @@ impl SemanticCtx {
             TypeDef::Builtin(_) => None,
         }
     }
+}
+
+pub fn semantic_check(ast: &Crate) -> Result<SemanticCtx, Vec<Diagnostic>> {
+    let mut diagnostics = Vec::new();
+    let mut ctx = SemanticCtx::new();
+
+    for builtin_type in BuiltinType::ALL {
+        let mut type_def = TypeDef::Builtin(BuiltinDef {
+            kind: builtin_type,
+            associated_values: Namespace::new(),
+        });
+
+        let associated_functions: &[&str] = match builtin_type {
+            BuiltinType::Box => &["new"],
+            BuiltinType::Vec => &["new", "len", "is_empty", "push", "remove"],
+            _ => &[],
+        };
+
+        for &name in associated_functions {
+            type_def
+                .associated_values_mut()
+                .define(
+                    name.to_string(),
+                    ValueDef {
+                        name: name.to_string(),
+                        ast_node_id: None,
+                        span: None,
+                        kind: ValueDefKind::BuiltinFunction,
+                    },
+                )
+                .expect("builtin define must success");
+        }
+
+        ctx.define_type(builtin_type.name().to_string(), type_def)
+            .expect("builtin name must not collide");
+    }
+    for builtin_value in ["get_i32", "print_i32", "println_i32"] {
+        ctx.define_value(
+            builtin_value.to_string(),
+            ValueDef {
+                name: builtin_value.to_string(),
+                ast_node_id: None,
+                span: None,
+                kind: ValueDefKind::BuiltinFunction,
+            },
+        )
+        .expect("builtin name must not collide");
+    }
+
+    def_collect(ast, &mut ctx, &mut diagnostics);
+    if !diagnostics.is_empty() {
+        return Err(diagnostics);
+    }
+
+    name_resolve(ast, &mut ctx, &mut diagnostics);
+    if !diagnostics.is_empty() {
+        return Err(diagnostics);
+    }
+
+    type_resolve(ast, &mut ctx, &mut diagnostics);
+    if !diagnostics.is_empty() {
+        return Err(diagnostics);
+    }
+
+    trait_check(ast, &mut ctx, &mut diagnostics);
+    if !diagnostics.is_empty() {
+        return Err(diagnostics);
+    }
+
+    body_check(ast, &mut ctx, &mut diagnostics);
+    if !diagnostics.is_empty() {
+        return Err(diagnostics);
+    }
+
+    entry_check(&ctx, &mut diagnostics);
+    if !diagnostics.is_empty() {
+        return Err(diagnostics);
+    }
+
+    Ok(ctx)
 }
