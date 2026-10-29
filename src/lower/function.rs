@@ -1,6 +1,8 @@
 use crate::{
     frontend::ast::{self, CallExpr, Expr, UnaryOp},
-    ir::{BinaryOp, Constant, FunctionId, IntPredicate, Operand, Signature, Terminator},
+    ir::{
+        BinaryOp, CastOp, Constant, FunctionId, IntPredicate, IrTy, Operand, Signature, Terminator,
+    },
     semantic::{self, Adjustment, DefId, TypeDef, TypedConstKind},
 };
 
@@ -140,7 +142,7 @@ impl IrLowerer<'_> {
             ast::ExprKind::Unary(unary) => self.lower_unary(expr.id, unary),
             ast::ExprKind::Binary(binary) => self.lower_binary(expr.id, binary),
             ast::ExprKind::Assign(_) => self.lower_assign(expr.id),
-            ast::ExprKind::Cast(_) => self.lower_cast(expr.id),
+            ast::ExprKind::Cast(cast) => self.lower_cast(expr.id, cast),
             ast::ExprKind::Unit => self.lower_unit(),
             ast::ExprKind::Array(_) => self.lower_array(expr.id),
             ast::ExprKind::Index(_) => self.lower_index(expr.id),
@@ -359,8 +361,18 @@ impl IrLowerer<'_> {
         todo!()
     }
 
-    fn lower_cast(&mut self, _id: ast::AstNodeId) -> Result<LoweredExpr, ()> {
-        todo!()
+    fn lower_cast(&mut self, id: ast::AstNodeId, cast: &ast::CastExpr) -> Result<LoweredExpr, ()> {
+        let operand = self.lower_expr(&cast.expr)?;
+        let value = operand.as_value(self);
+        let value = if matches!(operand.ty(), semantic::Ty::Bool) {
+            self.builder.cast(CastOp::ZExt, value, IrTy::I32)
+        } else {
+            value
+        };
+        Ok(LoweredExpr::value(
+            self.semantic.node_ty(id).unwrap().clone(),
+            value,
+        ))
     }
 
     fn lower_unit(&mut self) -> Result<LoweredExpr, ()> {
