@@ -7,7 +7,9 @@ BUILD = cargo build --release && \
     CARGO_PROFILE_RELEASE_LTO=true cargo build --quiet --locked --release \
     --manifest-path crates/rx/Cargo.toml \
     --target-dir target/reference \
-    --target riscv32im-unknown-none-elf && : > {runtime}
+    --target riscv32im-unknown-none-elf && \
+    $(CLANG) --target=riscv32-unknown-elf -march=rv32im -mabi=ilp32 \
+    -O2 -fno-builtin -S runtime/runtime.c -o {runtime}
 
 CLANG = /opt/homebrew/opt/llvm@22/bin/clang
 
