@@ -143,10 +143,26 @@ impl IrLowerer<'_> {
 
     fn lower_expr(&mut self, expr: &ast::Expr) -> Result<LoweredExpr, ()> {
         let mut lowered = match &expr.kind {
-            ast::ExprKind::Path(_) => self.lower_path(expr),
-            ast::ExprKind::Call(call_expr) => self.lower_call(expr, &call_expr.args)?,
-            _ => todo!(),
-        };
+            ast::ExprKind::Literal(_) => self.lower_literal(expr.id),
+            ast::ExprKind::Path(_) => self.lower_path(expr.id),
+            ast::ExprKind::Block(_) => self.lower_block(expr.id),
+            ast::ExprKind::Unary(_) => self.lower_unary(expr.id),
+            ast::ExprKind::Binary(_) => self.lower_binary(expr.id),
+            ast::ExprKind::Assign(_) => self.lower_assign(expr.id),
+            ast::ExprKind::Cast(_) => self.lower_cast(expr.id),
+            ast::ExprKind::Unit => self.lower_unit(expr.id),
+            ast::ExprKind::Array(_) => self.lower_array(expr.id),
+            ast::ExprKind::Index(_) => self.lower_index(expr.id),
+            ast::ExprKind::Struct(_) => self.lower_struct_expr(expr.id),
+            ast::ExprKind::Call(call_expr) => self.lower_call(expr.id, &call_expr.args),
+            ast::ExprKind::MethodCall(_) => self.lower_method_call(expr.id),
+            ast::ExprKind::Field(_) => self.lower_field(expr.id),
+            ast::ExprKind::Loop(_) => self.lower_loop(expr.id),
+            ast::ExprKind::Break(_) => self.lower_break(expr.id),
+            ast::ExprKind::Continue => self.lower_continue(expr.id),
+            ast::ExprKind::If(_) => self.lower_if(expr.id),
+            ast::ExprKind::Return(_) => self.lower_return(expr.id),
+        }?;
         if let Some(adjustment) = self.semantic.node_adjustment(expr.id) {
             for step in &adjustment.steps {
                 lowered = match step {
@@ -159,9 +175,13 @@ impl IrLowerer<'_> {
         Ok(lowered)
     }
 
-    fn lower_path(&mut self, expr: &ast::Expr) -> LoweredExpr {
-        let def_id = self.semantic.node_def(expr.id).unwrap();
-        match def_id {
+    fn lower_literal(&mut self, _id: ast::AstNodeId) -> Result<LoweredExpr, ()> {
+        todo!()
+    }
+
+    fn lower_path(&mut self, id: ast::AstNodeId) -> Result<LoweredExpr, ()> {
+        let def_id = self.semantic.node_def(id).unwrap();
+        Ok(match def_id {
             DefId::AssociatedValue { .. } | DefId::GlobalValue(_) => {
                 let def = def_id.as_value_def(self.semantic).unwrap();
                 let value = self.semantic.node_const(def.ast_node_id.unwrap()).unwrap();
@@ -171,7 +191,7 @@ impl IrLowerer<'_> {
                 };
                 LoweredExpr::value(
                     self.semantic
-                        .node_ty(expr.id)
+                        .node_ty(id)
                         .expect("expression must have a type")
                         .clone(),
                     Operand::Constant(constant),
@@ -183,11 +203,47 @@ impl IrLowerer<'_> {
                 .expect("local must be bound")
                 .clone(),
             _ => unreachable!("path must resolve to a value or local binding"),
-        }
+        })
     }
 
-    fn lower_call(&mut self, expr: &ast::Expr, args: &Vec<ast::Expr>) -> Result<LoweredExpr, ()> {
-        let target = self.semantic.node_call(expr.id).unwrap();
+    fn lower_block(&mut self, _id: ast::AstNodeId) -> Result<LoweredExpr, ()> {
+        todo!()
+    }
+
+    fn lower_unary(&mut self, _id: ast::AstNodeId) -> Result<LoweredExpr, ()> {
+        todo!()
+    }
+
+    fn lower_binary(&mut self, _id: ast::AstNodeId) -> Result<LoweredExpr, ()> {
+        todo!()
+    }
+
+    fn lower_assign(&mut self, _id: ast::AstNodeId) -> Result<LoweredExpr, ()> {
+        todo!()
+    }
+
+    fn lower_cast(&mut self, _id: ast::AstNodeId) -> Result<LoweredExpr, ()> {
+        todo!()
+    }
+
+    fn lower_unit(&mut self, _id: ast::AstNodeId) -> Result<LoweredExpr, ()> {
+        todo!()
+    }
+
+    fn lower_array(&mut self, _id: ast::AstNodeId) -> Result<LoweredExpr, ()> {
+        todo!()
+    }
+
+    fn lower_index(&mut self, _id: ast::AstNodeId) -> Result<LoweredExpr, ()> {
+        todo!()
+    }
+
+    fn lower_struct_expr(&mut self, _id: ast::AstNodeId) -> Result<LoweredExpr, ()> {
+        todo!()
+    }
+
+    fn lower_call(&mut self, id: ast::AstNodeId, args: &[ast::Expr]) -> Result<LoweredExpr, ()> {
+        let target = self.semantic.node_call(id).unwrap();
         let function_id = match &target.target {
             semantic::CallTarget::Builtin {
                 op:
@@ -220,8 +276,36 @@ impl IrLowerer<'_> {
         let return_value = self.builder.call(function_id, args);
 
         Ok(LoweredExpr::value(
-            self.semantic.node_ty(expr.id).unwrap().clone(),
+            self.semantic.node_ty(id).unwrap().clone(),
             return_value,
         ))
+    }
+
+    fn lower_method_call(&mut self, _id: ast::AstNodeId) -> Result<LoweredExpr, ()> {
+        todo!()
+    }
+
+    fn lower_field(&mut self, _id: ast::AstNodeId) -> Result<LoweredExpr, ()> {
+        todo!()
+    }
+
+    fn lower_loop(&mut self, _id: ast::AstNodeId) -> Result<LoweredExpr, ()> {
+        todo!()
+    }
+
+    fn lower_break(&mut self, _id: ast::AstNodeId) -> Result<LoweredExpr, ()> {
+        todo!()
+    }
+
+    fn lower_continue(&mut self, _id: ast::AstNodeId) -> Result<LoweredExpr, ()> {
+        todo!()
+    }
+
+    fn lower_if(&mut self, _id: ast::AstNodeId) -> Result<LoweredExpr, ()> {
+        todo!()
+    }
+
+    fn lower_return(&mut self, _id: ast::AstNodeId) -> Result<LoweredExpr, ()> {
+        todo!()
     }
 }
