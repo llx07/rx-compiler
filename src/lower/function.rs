@@ -1,5 +1,5 @@
 use crate::{
-    frontend::ast,
+    frontend::ast::{self, CallExpr, Expr},
     ir::{Constant, FunctionId, Operand, Signature, Terminator},
     semantic::{self, Adjustment, DefId, TypeDef, TypedConstKind},
 };
@@ -150,18 +150,20 @@ impl IrLowerer<'_> {
             ast::ExprKind::Binary(_) => self.lower_binary(expr.id),
             ast::ExprKind::Assign(_) => self.lower_assign(expr.id),
             ast::ExprKind::Cast(_) => self.lower_cast(expr.id),
-            ast::ExprKind::Unit => self.lower_unit(expr.id),
+            ast::ExprKind::Unit => self.lower_unit(),
             ast::ExprKind::Array(_) => self.lower_array(expr.id),
             ast::ExprKind::Index(_) => self.lower_index(expr.id),
             ast::ExprKind::Struct(_) => self.lower_struct_expr(expr.id),
-            ast::ExprKind::Call(call_expr) => self.lower_call(expr.id, &call_expr.args),
+            ast::ExprKind::Call(call_expr) => self.lower_call(expr.id, call_expr),
             ast::ExprKind::MethodCall(_) => self.lower_method_call(expr.id),
             ast::ExprKind::Field(_) => self.lower_field(expr.id),
             ast::ExprKind::Loop(_) => self.lower_loop(expr.id),
             ast::ExprKind::Break(_) => self.lower_break(expr.id),
             ast::ExprKind::Continue => self.lower_continue(expr.id),
             ast::ExprKind::If(_) => self.lower_if(expr.id),
-            ast::ExprKind::Return(_) => self.lower_return(expr.id),
+            ast::ExprKind::Return(return_value) => {
+                self.lower_return(expr.id, return_value.as_deref())
+            }
         }?;
         if let Some(adjustment) = self.semantic.node_adjustment(expr.id) {
             for step in &adjustment.steps {
@@ -175,8 +177,14 @@ impl IrLowerer<'_> {
         Ok(lowered)
     }
 
-    fn lower_literal(&mut self, _id: ast::AstNodeId) -> Result<LoweredExpr, ()> {
-        todo!()
+    fn lower_literal(&mut self, id: ast::AstNodeId) -> Result<LoweredExpr, ()> {
+        let ty = self.semantic.node_ty(id).unwrap().clone();
+        let value = self.semantic.node_literal(id).unwrap();
+        let constant = match ty {
+            semantic::Ty::Bool => Constant::I1(value != 0),
+            _ => Constant::I32(value as u32),
+        };
+        Ok(LoweredExpr::value(ty, Operand::Constant(constant)))
     }
 
     fn lower_path(&mut self, id: ast::AstNodeId) -> Result<LoweredExpr, ()> {
@@ -226,8 +234,8 @@ impl IrLowerer<'_> {
         todo!()
     }
 
-    fn lower_unit(&mut self, _id: ast::AstNodeId) -> Result<LoweredExpr, ()> {
-        todo!()
+    fn lower_unit(&mut self) -> Result<LoweredExpr, ()> {
+        Ok(LoweredExpr::value(semantic::Ty::Unit, Operand::Void))
     }
 
     fn lower_array(&mut self, _id: ast::AstNodeId) -> Result<LoweredExpr, ()> {
@@ -242,7 +250,7 @@ impl IrLowerer<'_> {
         todo!()
     }
 
-    fn lower_call(&mut self, id: ast::AstNodeId, args: &[ast::Expr]) -> Result<LoweredExpr, ()> {
+    fn lower_call(&mut self, id: ast::AstNodeId, call_expr: &CallExpr) -> Result<LoweredExpr, ()> {
         let target = self.semantic.node_call(id).unwrap();
         let function_id = match &target.target {
             semantic::CallTarget::Builtin {
@@ -265,10 +273,13 @@ impl IrLowerer<'_> {
                 self.functions[&DefId::GlobalValue(value)]
             }
             semantic::CallTarget::Builtin { op, type_arg } => todo!(),
-            semantic::CallTarget::User(_) => todo!(),
+            semantic::CallTarget::User(_) => {
+                self.functions[&self.semantic.node_def(call_expr.callee.id).unwrap()]
+            }
         };
 
-        let args = args
+        let args = call_expr
+            .args
             .iter()
             .map(|expr| self.lower_expr(expr).map(|value| value.as_value(self)))
             .collect::<Result<Vec<_>, _>>()?;
@@ -305,7 +316,17 @@ impl IrLowerer<'_> {
         todo!()
     }
 
-    fn lower_return(&mut self, _id: ast::AstNodeId) -> Result<LoweredExpr, ()> {
-        todo!()
+    fn lower_return(
+        &mut self,
+        id: ast::AstNodeId,
+        return_value: Option<&Expr>,
+    ) -> Result<LoweredExpr, ()> {
+        let operand = return_value
+            .map(|expr| self.lower_expr(expr))
+            .transpose()?
+            .map(|op| op.as_value(self));
+        self.builder
+            .terminate(Terminator::Ret(operand.unwrap_or(Operand::Void)));
+        Err(())
     }
 }
