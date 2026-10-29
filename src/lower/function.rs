@@ -1,6 +1,6 @@
 use crate::{
-    frontend::ast::{self, CallExpr, Expr},
-    ir::{Constant, FunctionId, Operand, Signature, Terminator},
+    frontend::ast::{self, CallExpr, Expr, UnaryOp},
+    ir::{BinaryOp, Constant, FunctionId, Operand, Signature, Terminator},
     semantic::{self, Adjustment, DefId, TypeDef, TypedConstKind},
 };
 
@@ -137,7 +137,7 @@ impl IrLowerer<'_> {
             ast::ExprKind::Literal(_) => self.lower_literal(expr.id),
             ast::ExprKind::Path(_) => self.lower_path(expr.id),
             ast::ExprKind::Block(block) => self.lower_block(block),
-            ast::ExprKind::Unary(_) => self.lower_unary(expr.id),
+            ast::ExprKind::Unary(unary) => self.lower_unary(expr.id, unary),
             ast::ExprKind::Binary(_) => self.lower_binary(expr.id),
             ast::ExprKind::Assign(_) => self.lower_assign(expr.id),
             ast::ExprKind::Cast(_) => self.lower_cast(expr.id),
@@ -217,8 +217,33 @@ impl IrLowerer<'_> {
         }
     }
 
-    fn lower_unary(&mut self, _id: ast::AstNodeId) -> Result<LoweredExpr, ()> {
-        todo!()
+    fn lower_unary(
+        &mut self,
+        id: ast::AstNodeId,
+        unary: &ast::UnaryExpr,
+    ) -> Result<LoweredExpr, ()> {
+        let operand = self.lower_expr(&unary.operand)?;
+
+        let lowered = match unary.op {
+            UnaryOp::Neg | UnaryOp::Not => {
+                let operand = if matches!(operand.ty(), semantic::Ty::Ref { .. }) {
+                    operand.deref(self)
+                } else {
+                    operand
+                };
+                let operand_value = operand.as_value(self);
+                let value = match unary.op {
+                    UnaryOp::Neg => self.builder.neg(operand_value),
+                    UnaryOp::Not => self.builder.not(operand_value),
+                    _ => unreachable!(),
+                };
+                LoweredExpr::value(self.semantic.node_ty(id).unwrap().clone(), value)
+            }
+            UnaryOp::Deref => operand.deref(self),
+            UnaryOp::Borrow | UnaryOp::BorrowMut => operand.borrow(unary.op == UnaryOp::BorrowMut),
+        };
+
+        Ok(lowered)
     }
 
     fn lower_binary(&mut self, _id: ast::AstNodeId) -> Result<LoweredExpr, ()> {

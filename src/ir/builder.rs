@@ -1,7 +1,7 @@
 use crate::ir::BasicBlock;
 
 use super::{
-    BinaryOp, BlockId, CastOp, Function, FunctionBody, FunctionId, InstId, Instruction,
+    BinaryOp, BlockId, CastOp, Constant, Function, FunctionBody, FunctionId, InstId, Instruction,
     InstructionKind, IntPredicate, IrTy, Module, Operand, Signature, StructDef, StructId,
     Terminator,
 };
@@ -163,6 +163,22 @@ impl Builder {
 
     pub fn binary(&mut self, op: BinaryOp, lhs: Operand, rhs: Operand) -> Operand {
         Operand::Instruction(self.append_instruction(InstructionKind::Binary { op, lhs, rhs }))
+    }
+
+    pub fn neg(&mut self, value: Operand) -> Operand {
+        self.binary(BinaryOp::Sub, Operand::Constant(Constant::I32(0)), value)
+    }
+
+    pub fn not(&mut self, value: Operand) -> Operand {
+        let function = &self.module.functions
+            [self.current_function.expect("no function selected").0 as usize];
+        let mask = match value.ty(function) {
+            IrTy::I1 => Constant::I1(true),
+            IrTy::I8 => Constant::I8(u8::MAX),
+            IrTy::I32 => Constant::I32(u32::MAX),
+            _ => unreachable!("not requires an integer operand"),
+        };
+        self.binary(BinaryOp::Xor, value, Operand::Constant(mask))
     }
 
     pub fn icmp(&mut self, predicate: IntPredicate, lhs: Operand, rhs: Operand) -> Operand {
