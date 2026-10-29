@@ -523,7 +523,7 @@ pub struct UseAdjustment {
 #[derive(Debug, Clone)]
 pub enum Adjustment {
     Deref,
-    Borrow,
+    Borrow { is_mut: bool },
     MaterializeTemporary,
 }
 

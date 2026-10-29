@@ -32,6 +32,7 @@ fn emit_struct(out: &mut String, id: StructId, structure: &StructDef) {
 
 fn format_operand(operand: Operand) -> String {
     match operand {
+        Operand::Void => panic!("void cannot be printed as an operand"),
         Operand::Parameter(index) => format!("%p{index}"),
         Operand::Instruction(id) => format!("%v{}", id.0),
         Operand::Constant(constant) => match constant {
@@ -66,10 +67,10 @@ fn emit_terminal(out: &mut String, terminal: &Terminator, function: &Function) {
             else_block.0,
         )
         .unwrap(),
-        Terminator::Ret(Some(value)) => {
+        Terminator::Ret(Operand::Void) => writeln!(out, "  ret void").unwrap(),
+        Terminator::Ret(value) => {
             writeln!(out, "  ret {}", format_typed_operand(*value, function),).unwrap()
         }
-        Terminator::Ret(None) => writeln!(out, "  ret void").unwrap(),
         Terminator::Unreachable => writeln!(out, "  unreachable").unwrap(),
     }
 }

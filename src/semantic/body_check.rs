@@ -1223,8 +1223,8 @@ impl BodyChecker<'_> {
                     return Err(());
                 }
 
-                if borrow.is_some() {
-                    steps.push(Adjustment::Borrow);
+                if let Some(is_mut) = borrow {
+                    steps.push(Adjustment::Borrow { is_mut });
                 }
                 break 'lookup MethodCandidate {
                     call,
@@ -1253,7 +1253,7 @@ impl BodyChecker<'_> {
         if self.ctx.node_place(expr.receiver.id).is_none()
             && matches!(
                 selected.receiver_adjustment.steps.as_slice(),
-                [Adjustment::Borrow]
+                [Adjustment::Borrow { .. }]
             )
         {
             self.ctx.materialize_value(expr.receiver.id);
@@ -1686,7 +1686,7 @@ fn plan_ordering(lhs: &Ty, rhs: &Ty) -> Result<Option<UseAdjustment>, String> {
         {
             return Ok(Some(UseAdjustment {
                 target: lhs.clone(),
-                steps: vec![Adjustment::Deref, Adjustment::Borrow],
+                steps: vec![Adjustment::Deref, Adjustment::Borrow { is_mut: false }],
             }));
         }
     }
@@ -1753,7 +1753,7 @@ fn plan_coercion(from: &Ty, to: &Ty) -> Result<UseAdjustment, String> {
         return Err(format!("cannot coerce {:?} to {:?}", from, to));
     }
 
-    steps.push(Adjustment::Borrow);
+    steps.push(Adjustment::Borrow { is_mut: to_mut });
     Ok(UseAdjustment {
         target: to.clone(),
         steps,

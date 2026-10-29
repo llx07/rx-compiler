@@ -177,11 +177,11 @@ impl Builder {
         Operand::Instruction(self.append_instruction(InstructionKind::Cast { op, value, to }))
     }
 
-    pub fn call(&mut self, function: FunctionId, args: Vec<Operand>) -> Option<Operand> {
+    pub fn call(&mut self, function: FunctionId, args: Vec<Operand>) -> Operand {
         let id = self.append_instruction(InstructionKind::Call { function, args });
         self.body().instructions[id.0 as usize]
             .result_ty()
-            .map(|_| Operand::Instruction(id))
+            .map_or(Operand::Void, |_| Operand::Instruction(id))
     }
 
     pub fn terminate(&mut self, terminator: Terminator) {

@@ -83,6 +83,7 @@ impl Constant {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Operand {
+    Void,
     Parameter(u32),
     Instruction(InstId),
     Constant(Constant),
@@ -91,6 +92,7 @@ pub enum Operand {
 impl Operand {
     pub fn ty<'a>(&self, function: &'a Function) -> &'a IrTy {
         match self {
+            Self::Void => &IrTy::Void,
             Self::Parameter(index) => &function.signature.params[*index as usize],
             Self::Instruction(id) => function
                 .body
@@ -203,7 +205,6 @@ pub enum Terminator {
         then_block: BlockId,
         else_block: BlockId,
     },
-    /// None for returning void
-    Ret(Option<Operand>),
+    Ret(Operand),
     Unreachable,
 }

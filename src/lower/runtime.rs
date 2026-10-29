@@ -20,9 +20,7 @@ impl IrLowerer<'_> {
         self.builder.position_at_end(entry);
         self.builder.call(source_main, Vec::new());
         self.builder
-            .terminate(ir::Terminator::Ret(Some(Operand::Constant(
-                ir::Constant::I32(0),
-            ))));
+            .terminate(ir::Terminator::Ret(Operand::Constant(ir::Constant::I32(0))));
     }
 
     pub(super) fn declare_builtins(&mut self) {

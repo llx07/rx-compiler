@@ -1,3 +1,4 @@
+mod expr;
 mod function;
 mod runtime;
 mod ty;
@@ -13,7 +14,7 @@ use crate::{
 struct IrLowerer<'a> {
     semantic: &'a SemanticCtx,
     builder: Builder,
-    locals: HashMap<LocalId, function::Place>,
+    locals: HashMap<LocalId, expr::LoweredExpr>,
     structs: HashMap<TypeId, StructId>,
     functions: HashMap<DefId, FunctionId>,
     vec_struct: Option<StructId>,

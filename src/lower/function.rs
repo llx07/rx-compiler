@@ -1,10 +1,10 @@
 use crate::{
     frontend::ast,
     ir::{Constant, FunctionId, Operand, Signature, Terminator},
-    semantic::{Adjustment, DefId, Ty, TypeDef, TypedConstKind},
+    semantic::{Adjustment, DefId, TypeDef, TypedConstKind},
 };
 
-use super::IrLowerer;
+use super::{IrLowerer, expr::LoweredExpr};
 
 /// Encodes a source type name for use in associated-value symbols.
 fn mangle_ty(name: &str) -> String {
@@ -66,17 +66,6 @@ impl IrLowerer<'_> {
     }
 }
 
-struct Value {
-    /// Unit has no IR operand, but still has a source type.
-    operand: Option<Operand>,
-    ty: Ty,
-}
-
-pub(super) struct Place {
-    ptr: Operand,
-    ty: Ty,
-}
-
 impl IrLowerer<'_> {
     // Err(()) means control flow has already terminated.
     fn lower_body(&mut self, function: &ast::Function) -> Result<(), ()> {
@@ -90,8 +79,11 @@ impl IrLowerer<'_> {
         }
 
         let result = match &function.body.tail {
-            Some(expr) => self.lower_expr(expr)?.operand,
-            None => None,
+            Some(expr) => {
+                let value = self.lower_expr(expr)?;
+                value.as_value(self)
+            }
+            None => Operand::Void,
         };
 
         self.builder.terminate(Terminator::Ret(result));
@@ -115,13 +107,8 @@ impl IrLowerer<'_> {
             let ptr = self.builder.alloca_in_entry(ty, align);
             self.builder
                 .store(Operand::Parameter(index as u32), ptr, align);
-            self.locals.insert(
-                local_id,
-                Place {
-                    ptr,
-                    ty: source_ty.clone(),
-                },
-            );
+            self.locals
+                .insert(local_id, LoweredExpr::place(source_ty.clone(), ptr));
         }
     }
 
@@ -144,22 +131,18 @@ impl IrLowerer<'_> {
 
         let ptr = self.builder.alloca_in_entry(ir_ty, align);
 
-        self.builder
-            .store(value.operand.expect("let stmt has a value"), ptr, align);
+        debug_assert_eq!(value.ty(), ty);
+        let operand = value.as_value(self);
+        self.builder.store(operand, ptr, align);
 
-        self.locals.insert(
-            local_id,
-            Place {
-                ptr,
-                ty: ty.clone(),
-            },
-        );
+        self.locals
+            .insert(local_id, LoweredExpr::place(ty.clone(), ptr));
 
         Ok(())
     }
 
-    fn lower_expr(&mut self, expr: &ast::Expr) -> Result<Value, ()> {
-        let operand = match &expr.kind {
+    fn lower_expr(&mut self, expr: &ast::Expr) -> Result<LoweredExpr, ()> {
+        let mut lowered = match &expr.kind {
             ast::ExprKind::Path(_) => {
                 let def_id = self.semantic.node_def(expr.id).unwrap();
                 match def_id {
@@ -170,52 +153,33 @@ impl IrLowerer<'_> {
                             TypedConstKind::Bool => Constant::I1(value.value != 0),
                             _ => Constant::I32(value.value as u32),
                         };
-                        Some(Operand::Constant(constant))
+                        LoweredExpr::value(
+                            self.semantic
+                                .node_ty(expr.id)
+                                .expect("expression must have a type")
+                                .clone(),
+                            Operand::Constant(constant),
+                        )
                     }
-                    DefId::Local(local) => {
-                        let place = self.locals.get(&local).expect("local must be bound");
-                        if place.ty == Ty::Unit {
-                            None
-                        } else {
-                            let ty = self.lower_ty(place.ty.clone());
-                            let align = self.align_of(&place.ty);
-                            Some(self.builder.load(ty, place.ptr, align))
-                        }
-                    }
-                    DefId::Type(_) | DefId::Field { .. } => {
-                        unreachable!("path must resolve to a value or local binding")
-                    }
+                    DefId::Local(local) => self
+                        .locals
+                        .get(&local)
+                        .expect("local must be bound")
+                        .clone(),
+                    _ => unreachable!("path must resolve to a value or local binding"),
                 }
             }
             _ => todo!(),
         };
-
-        let value = Value {
-            operand,
-            ty: self
-                .semantic
-                .node_ty(expr.id)
-                .expect("expression must have a type")
-                .clone(),
-        };
-        
         if let Some(adjustment) = self.semantic.node_adjustment(expr.id) {
             for step in &adjustment.steps {
-                match step {
-                    Adjustment::Borrow => {
-                        
-                    },
-                    Adjustment::Deref => todo!(),
-                    Adjustment::MaterializeTemporary => todo!(),
-                }
+                lowered = match step {
+                    Adjustment::Borrow { is_mut } => lowered.borrow(*is_mut),
+                    Adjustment::Deref => lowered.deref(self),
+                    Adjustment::MaterializeTemporary => lowered.materialize(self),
+                };
             }
-            debug_assert_eq!(value.ty, adjustment.target);
         }
-
-        Ok(value)
-    }
-
-    fn lower_place(&mut self, expr: &ast::Expr) -> Result<Place, ()> {
-        todo!()
+        Ok(lowered)
     }
 }
