@@ -143,32 +143,7 @@ impl IrLowerer<'_> {
 
     fn lower_expr(&mut self, expr: &ast::Expr) -> Result<LoweredExpr, ()> {
         let mut lowered = match &expr.kind {
-            ast::ExprKind::Path(_) => {
-                let def_id = self.semantic.node_def(expr.id).unwrap();
-                match def_id {
-                    DefId::AssociatedValue { .. } | DefId::GlobalValue(_) => {
-                        let def = def_id.as_value_def(self.semantic).unwrap();
-                        let value = self.semantic.node_const(def.ast_node_id.unwrap()).unwrap();
-                        let constant = match value.kind {
-                            TypedConstKind::Bool => Constant::I1(value.value != 0),
-                            _ => Constant::I32(value.value as u32),
-                        };
-                        LoweredExpr::value(
-                            self.semantic
-                                .node_ty(expr.id)
-                                .expect("expression must have a type")
-                                .clone(),
-                            Operand::Constant(constant),
-                        )
-                    }
-                    DefId::Local(local) => self
-                        .locals
-                        .get(&local)
-                        .expect("local must be bound")
-                        .clone(),
-                    _ => unreachable!("path must resolve to a value or local binding"),
-                }
-            }
+            ast::ExprKind::Path(_) => self.lower_path(expr),
             _ => todo!(),
         };
         if let Some(adjustment) = self.semantic.node_adjustment(expr.id) {
@@ -181,5 +156,32 @@ impl IrLowerer<'_> {
             }
         }
         Ok(lowered)
+    }
+
+    fn lower_path(&mut self, expr: &ast::Expr) -> LoweredExpr {
+        let def_id = self.semantic.node_def(expr.id).unwrap();
+        match def_id {
+            DefId::AssociatedValue { .. } | DefId::GlobalValue(_) => {
+                let def = def_id.as_value_def(self.semantic).unwrap();
+                let value = self.semantic.node_const(def.ast_node_id.unwrap()).unwrap();
+                let constant = match value.kind {
+                    TypedConstKind::Bool => Constant::I1(value.value != 0),
+                    _ => Constant::I32(value.value as u32),
+                };
+                LoweredExpr::value(
+                    self.semantic
+                        .node_ty(expr.id)
+                        .expect("expression must have a type")
+                        .clone(),
+                    Operand::Constant(constant),
+                )
+            }
+            DefId::Local(local) => self
+                .locals
+                .get(&local)
+                .expect("local must be bound")
+                .clone(),
+            _ => unreachable!("path must resolve to a value or local binding"),
+        }
     }
 }
