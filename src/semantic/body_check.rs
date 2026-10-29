@@ -1223,8 +1223,8 @@ impl BodyChecker<'_> {
                     return Err(());
                 }
 
-                if let Some(is_mut) = borrow {
-                    steps.push(Adjustment::Borrow { is_mut });
+                if borrow.is_some() {
+                    steps.push(Adjustment::Borrow);
                 }
                 break 'lookup MethodCandidate {
                     call,
@@ -1253,7 +1253,7 @@ impl BodyChecker<'_> {
         if self.ctx.node_place(expr.receiver.id).is_none()
             && matches!(
                 selected.receiver_adjustment.steps.as_slice(),
-                [Adjustment::Borrow { .. }]
+                [Adjustment::Borrow]
             )
         {
             self.ctx.materialize_value(expr.receiver.id);
@@ -1686,7 +1686,7 @@ fn plan_ordering(lhs: &Ty, rhs: &Ty) -> Result<Option<UseAdjustment>, String> {
         {
             return Ok(Some(UseAdjustment {
                 target: lhs.clone(),
-                steps: vec![Adjustment::Deref, Adjustment::Borrow { is_mut: false }],
+                steps: vec![Adjustment::Deref, Adjustment::Borrow],
             }));
         }
     }
@@ -1725,19 +1725,12 @@ fn ty_deref(ty: &Ty) -> Result<(bool, &Ty), String> {
 }
 
 fn plan_coercion(from: &Ty, to: &Ty) -> Result<UseAdjustment, String> {
-    if from == to {
+    if from == to || *from == Ty::Never {
         return Ok(UseAdjustment {
             target: to.clone(),
             steps: Vec::new(),
         });
     };
-
-    if *from == Ty::Never {
-        return Ok(UseAdjustment {
-            target: to.clone(),
-            steps: vec![Adjustment::NeverTo],
-        });
-    }
 
     if !matches!(from, Ty::Ref { .. }) || !matches!(to, Ty::Ref { .. }) {
         return Err(format!("cannot coerce {:?} to {:?}", from, to));
@@ -1760,7 +1753,7 @@ fn plan_coercion(from: &Ty, to: &Ty) -> Result<UseAdjustment, String> {
         return Err(format!("cannot coerce {:?} to {:?}", from, to));
     }
 
-    steps.push(Adjustment::Borrow { is_mut: to_mut });
+    steps.push(Adjustment::Borrow);
     Ok(UseAdjustment {
         target: to.clone(),
         steps,
