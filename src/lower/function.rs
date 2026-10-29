@@ -1,7 +1,7 @@
 use crate::{
     frontend::ast,
     ir::{Constant, FunctionId, Operand, Signature, Terminator},
-    semantic::{Adjustment, DefId, TypeDef, TypedConstKind},
+    semantic::{self, Adjustment, DefId, TypeDef, TypedConstKind},
 };
 
 use super::{IrLowerer, expr::LoweredExpr};
@@ -144,6 +144,7 @@ impl IrLowerer<'_> {
     fn lower_expr(&mut self, expr: &ast::Expr) -> Result<LoweredExpr, ()> {
         let mut lowered = match &expr.kind {
             ast::ExprKind::Path(_) => self.lower_path(expr),
+            ast::ExprKind::Call(call_expr) => self.lower_call(expr, &call_expr.args)?,
             _ => todo!(),
         };
         if let Some(adjustment) = self.semantic.node_adjustment(expr.id) {
@@ -183,5 +184,44 @@ impl IrLowerer<'_> {
                 .clone(),
             _ => unreachable!("path must resolve to a value or local binding"),
         }
+    }
+
+    fn lower_call(&mut self, expr: &ast::Expr, args: &Vec<ast::Expr>) -> Result<LoweredExpr, ()> {
+        let target = self.semantic.node_call(expr.id).unwrap();
+        let function_id = match &target.target {
+            semantic::CallTarget::Builtin {
+                op:
+                    op @ (semantic::BuiltinOp::GetI32
+                    | semantic::BuiltinOp::PrintI32
+                    | semantic::BuiltinOp::PrintlnI32),
+                ..
+            } => {
+                let name = match op {
+                    semantic::BuiltinOp::GetI32 => "get_i32",
+                    semantic::BuiltinOp::PrintI32 => "print_i32",
+                    semantic::BuiltinOp::PrintlnI32 => "println_i32",
+                    _ => unreachable!(),
+                };
+                let value = self
+                    .semantic
+                    .lookup_value_def(name)
+                    .expect("I/O builtin must be collected");
+                self.functions[&DefId::GlobalValue(value)]
+            }
+            semantic::CallTarget::Builtin { op, type_arg } => todo!(),
+            semantic::CallTarget::User(_) => todo!(),
+        };
+
+        let args = args
+            .iter()
+            .map(|expr| self.lower_expr(expr).map(|value| value.as_value(self)))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let return_value = self.builder.call(function_id, args);
+
+        Ok(LoweredExpr::value(
+            self.semantic.node_ty(expr.id).unwrap().clone(),
+            return_value,
+        ))
     }
 }
