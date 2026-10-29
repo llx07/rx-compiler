@@ -1,6 +1,6 @@
 use crate::{
     frontend::ast::{self, CallExpr, Expr, UnaryOp},
-    ir::{BinaryOp, Constant, FunctionId, Operand, Signature, Terminator},
+    ir::{BinaryOp, Constant, FunctionId, IntPredicate, Operand, Signature, Terminator},
     semantic::{self, Adjustment, DefId, TypeDef, TypedConstKind},
 };
 
@@ -138,7 +138,7 @@ impl IrLowerer<'_> {
             ast::ExprKind::Path(_) => self.lower_path(expr.id),
             ast::ExprKind::Block(block) => self.lower_block(block),
             ast::ExprKind::Unary(unary) => self.lower_unary(expr.id, unary),
-            ast::ExprKind::Binary(_) => self.lower_binary(expr.id),
+            ast::ExprKind::Binary(binary) => self.lower_binary(expr.id, binary),
             ast::ExprKind::Assign(_) => self.lower_assign(expr.id),
             ast::ExprKind::Cast(_) => self.lower_cast(expr.id),
             ast::ExprKind::Unit => self.lower_unit(),
@@ -246,7 +246,112 @@ impl IrLowerer<'_> {
         Ok(lowered)
     }
 
-    fn lower_binary(&mut self, _id: ast::AstNodeId) -> Result<LoweredExpr, ()> {
+    fn lower_binary(
+        &mut self,
+        id: ast::AstNodeId,
+        binary: &ast::BinaryExpr,
+    ) -> Result<LoweredExpr, ()> {
+        use ast::BinaryOp as Op;
+
+        match binary.op {
+            Op::And | Op::Or => return self.lower_short_circuit(id, binary),
+            Op::Eq | Op::Ne => return self.lower_equality(id, binary),
+            _ => {}
+        }
+
+        let ty = self.semantic.node_ty(id).unwrap().clone();
+        let lhs = self.lower_expr(&binary.lhs)?;
+        let mut lhs = LoweredExpr::value(lhs.ty().clone(), lhs.as_value(self));
+        let rhs = self.lower_expr(&binary.rhs)?;
+        let mut rhs = LoweredExpr::value(rhs.ty().clone(), rhs.as_value(self));
+
+        while matches!(lhs.ty(), semantic::Ty::Ref { .. }) {
+            lhs = lhs.deref(self);
+        }
+        while matches!(rhs.ty(), semantic::Ty::Ref { .. }) {
+            rhs = rhs.deref(self);
+        }
+
+        let signed = matches!(lhs.ty(), semantic::Ty::I32 | semantic::Ty::ISize);
+
+        let lhs = lhs.as_value(self);
+        let rhs = rhs.as_value(self);
+        let value = match binary.op {
+            Op::Lt | Op::Le | Op::Gt | Op::Ge => self.lower_compare(binary.op, lhs, rhs, signed),
+            _ => self.lower_binary_arithmetic(binary.op, lhs, rhs, signed),
+        };
+        Ok(LoweredExpr::value(ty, value))
+    }
+
+    fn lower_compare(
+        &mut self,
+        op: ast::BinaryOp,
+        lhs: Operand,
+        rhs: Operand,
+        signed: bool,
+    ) -> Operand {
+        use ast::BinaryOp as Op;
+
+        let predicate = match (op, signed) {
+            (Op::Lt, true) => IntPredicate::Slt,
+            (Op::Lt, false) => IntPredicate::Ult,
+            (Op::Le, true) => IntPredicate::Sle,
+            (Op::Le, false) => IntPredicate::Ule,
+            (Op::Gt, true) => IntPredicate::Sgt,
+            (Op::Gt, false) => IntPredicate::Ugt,
+            (Op::Ge, true) => IntPredicate::Sge,
+            (Op::Ge, false) => IntPredicate::Uge,
+            _ => unreachable!(),
+        };
+        self.builder.icmp(predicate, lhs, rhs)
+    }
+
+    fn lower_binary_arithmetic(
+        &mut self,
+        op: ast::BinaryOp,
+        lhs: Operand,
+        mut rhs: Operand,
+        signed: bool,
+    ) -> Operand {
+        use ast::BinaryOp as Op;
+
+        if matches!(op, Op::Shl | Op::Shr) {
+            rhs = self
+                .builder
+                .binary(BinaryOp::And, rhs, Operand::Constant(Constant::I32(31)));
+        }
+        let op = match (op, signed) {
+            (Op::Add, _) => BinaryOp::Add,
+            (Op::Sub, _) => BinaryOp::Sub,
+            (Op::Mul, _) => BinaryOp::Mul,
+            (Op::Div, true) => BinaryOp::SDiv,
+            (Op::Div, false) => BinaryOp::UDiv,
+            (Op::Rem, true) => BinaryOp::SRem,
+            (Op::Rem, false) => BinaryOp::URem,
+            (Op::BitAnd, _) => BinaryOp::And,
+            (Op::BitOr, _) => BinaryOp::Or,
+            (Op::BitXor, _) => BinaryOp::Xor,
+            (Op::Shl, _) => BinaryOp::Shl,
+            (Op::Shr, true) => BinaryOp::AShr,
+            (Op::Shr, false) => BinaryOp::LShr,
+            _ => unreachable!(),
+        };
+        self.builder.binary(op, lhs, rhs)
+    }
+
+    fn lower_short_circuit(
+        &mut self,
+        _id: ast::AstNodeId,
+        _binary: &ast::BinaryExpr,
+    ) -> Result<LoweredExpr, ()> {
+        todo!()
+    }
+
+    fn lower_equality(
+        &mut self,
+        _id: ast::AstNodeId,
+        _binary: &ast::BinaryExpr,
+    ) -> Result<LoweredExpr, ()> {
         todo!()
     }
 
