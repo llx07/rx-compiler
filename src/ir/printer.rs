@@ -1,8 +1,8 @@
 use std::fmt::Write;
 
 use crate::ir::{
-    BasicBlock, BinaryOp, CastOp, Constant, Function, InstId, Instruction, IntPredicate, IrTy,
-    Module, Operand, StructDef, StructId, Terminator,
+    BasicBlock, BinaryOp, CastOp, Constant, Function, InstId, Instruction, InstructionKind,
+    IntPredicate, IrTy, Module, Operand, StructDef, StructId, Terminator,
 };
 
 fn format_ty(ty: &IrTy) -> String {
@@ -43,15 +43,15 @@ fn format_operand(operand: Operand) -> String {
     }
 }
 
-fn format_typed_operand(operand: Operand, module: &Module, function: &Function) -> String {
+fn format_typed_operand(operand: Operand, function: &Function) -> String {
     format!(
         "{} {}",
-        format_ty(&operand.ty(module, function)),
+        format_ty(operand.ty(function)),
         format_operand(operand),
     )
 }
 
-fn emit_terminal(out: &mut String, terminal: &Terminator, module: &Module, function: &Function) {
+fn emit_terminal(out: &mut String, terminal: &Terminator, function: &Function) {
     match terminal {
         Terminator::Br(block) => writeln!(out, "  br label %bb{}", block.0).unwrap(),
         Terminator::CondBr {
@@ -61,17 +61,14 @@ fn emit_terminal(out: &mut String, terminal: &Terminator, module: &Module, funct
         } => writeln!(
             out,
             "  br {}, label %bb{}, label %bb{}",
-            format_typed_operand(*condition, module, function),
+            format_typed_operand(*condition, function),
             then_block.0,
             else_block.0,
         )
         .unwrap(),
-        Terminator::Ret(Some(value)) => writeln!(
-            out,
-            "  ret {}",
-            format_typed_operand(*value, module, function),
-        )
-        .unwrap(),
+        Terminator::Ret(Some(value)) => {
+            writeln!(out, "  ret {}", format_typed_operand(*value, function),).unwrap()
+        }
         Terminator::Ret(None) => writeln!(out, "  ret void").unwrap(),
         Terminator::Unreachable => writeln!(out, "  unreachable").unwrap(),
     }
@@ -85,14 +82,14 @@ fn emit_inst(
     function: &Function,
 ) {
     write!(out, "  ").unwrap();
-    if inst.result_ty(module, function).is_some() {
+    if inst.result_ty().is_some() {
         write!(out, "%v{} = ", id.0).unwrap();
     }
-    match inst {
-        Instruction::Alloca { ty, align } => {
+    match &inst.kind {
+        InstructionKind::Alloca { ty, align } => {
             write!(out, "alloca {}, align {align}", format_ty(ty)).unwrap();
         }
-        Instruction::Load { ty, ptr, align } => {
+        InstructionKind::Load { ty, ptr, align } => {
             write!(
                 out,
                 "load {}, ptr {}, align {align}",
@@ -101,16 +98,16 @@ fn emit_inst(
             )
             .unwrap();
         }
-        Instruction::Store { value, ptr, align } => {
+        InstructionKind::Store { value, ptr, align } => {
             write!(
                 out,
                 "store {}, ptr {}, align {align}",
-                format_typed_operand(*value, module, function),
+                format_typed_operand(*value, function),
                 format_operand(*ptr)
             )
             .unwrap();
         }
-        Instruction::GetElementPtr {
+        InstructionKind::GetElementPtr {
             source_ty,
             ptr,
             indices,
@@ -123,10 +120,10 @@ fn emit_inst(
             )
             .unwrap();
             for index in indices {
-                write!(out, ", {}", format_typed_operand(*index, module, function)).unwrap();
+                write!(out, ", {}", format_typed_operand(*index, function)).unwrap();
             }
         }
-        Instruction::Binary { op, lhs, rhs } => {
+        InstructionKind::Binary { op, lhs, rhs } => {
             let opcode = match op {
                 BinaryOp::Add => "add",
                 BinaryOp::Sub => "sub",
@@ -145,12 +142,12 @@ fn emit_inst(
             write!(
                 out,
                 "{opcode} {}, {}",
-                format_typed_operand(*lhs, module, function),
+                format_typed_operand(*lhs, function),
                 format_operand(*rhs)
             )
             .unwrap();
         }
-        Instruction::ICmp {
+        InstructionKind::ICmp {
             predicate,
             lhs,
             rhs,
@@ -170,12 +167,12 @@ fn emit_inst(
             write!(
                 out,
                 "icmp {predicate} {}, {}",
-                format_typed_operand(*lhs, module, function),
+                format_typed_operand(*lhs, function),
                 format_operand(*rhs)
             )
             .unwrap();
         }
-        Instruction::Cast { op, value, to } => {
+        InstructionKind::Cast { op, value, to } => {
             let opcode = match op {
                 CastOp::ZExt => "zext",
                 CastOp::Trunc => "trunc",
@@ -183,19 +180,19 @@ fn emit_inst(
             write!(
                 out,
                 "{opcode} {} to {}",
-                format_typed_operand(*value, module, function),
+                format_typed_operand(*value, function),
                 format_ty(to)
             )
             .unwrap();
         }
-        Instruction::Call {
+        InstructionKind::Call {
             function: callee,
             args,
         } => {
             let callee = &module.functions[callee.0 as usize];
             let args = args
                 .iter()
-                .map(|arg| format_typed_operand(*arg, module, function))
+                .map(|arg| format_typed_operand(*arg, function))
                 .collect::<Vec<_>>()
                 .join(", ");
             write!(
@@ -234,7 +231,6 @@ fn emit_block(
             .terminator
             .as_ref()
             .expect("block must have a terminator"),
-        module,
         function,
     );
 }

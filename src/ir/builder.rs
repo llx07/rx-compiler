@@ -2,7 +2,8 @@ use crate::ir::BasicBlock;
 
 use super::{
     BinaryOp, BlockId, CastOp, Function, FunctionBody, FunctionId, InstId, Instruction,
-    IntPredicate, IrTy, Module, Operand, Signature, StructDef, StructId, Terminator,
+    InstructionKind, IntPredicate, IrTy, Module, Operand, Signature, StructDef, StructId,
+    Terminator,
 };
 
 pub struct Builder {
@@ -69,7 +70,32 @@ impl Builder {
             .expect("function builder must have a body")
     }
 
-    fn append_instruction(&mut self, inst: Instruction) -> InstId {
+    fn build_instruction(&self, kind: InstructionKind) -> Instruction {
+        let result_ty = match &kind {
+            InstructionKind::Alloca { .. } | InstructionKind::GetElementPtr { .. } => {
+                Some(IrTy::Ptr)
+            }
+            InstructionKind::Load { ty, .. } => Some(ty.clone()),
+            InstructionKind::Store { .. } => None,
+            InstructionKind::Binary { lhs, rhs, .. } => {
+                let function = &self.module.functions
+                    [self.current_function.expect("no function selected").0 as usize];
+                let ty = lhs.ty(function);
+                assert_eq!(ty, rhs.ty(function), "binary operand types must match");
+                Some(ty.clone())
+            }
+            InstructionKind::ICmp { .. } => Some(IrTy::I1),
+            InstructionKind::Cast { to, .. } => Some(to.clone()),
+            InstructionKind::Call { function, .. } => {
+                let ty = &self.module.functions[function.0 as usize].signature.result;
+                (*ty != IrTy::Void).then(|| ty.clone())
+            }
+        };
+        Instruction { kind, result_ty }
+    }
+
+    fn append_instruction(&mut self, kind: InstructionKind) -> InstId {
+        let inst = self.build_instruction(kind);
         let block_id = self.current_block_id.expect("no insertion block selected");
         let body = self.body_mut();
         let block = body
@@ -101,24 +127,25 @@ impl Builder {
     }
 
     pub fn alloca(&mut self, ty: IrTy, align: u32) -> Operand {
-        Operand::Instruction(self.append_instruction(Instruction::Alloca { ty, align }))
+        Operand::Instruction(self.append_instruction(InstructionKind::Alloca { ty, align }))
     }
 
     pub fn alloca_in_entry(&mut self, ty: IrTy, align: u32) -> Operand {
+        let inst = self.build_instruction(InstructionKind::Alloca { ty, align });
         let body = self.body_mut();
         let entry = body.blocks.first_mut().expect("entry block must exist");
         let id = InstId(body.instructions.len() as u32);
-        body.instructions.push(Instruction::Alloca { ty, align });
+        body.instructions.push(inst);
         entry.instructions.insert(0, id);
         Operand::Instruction(id)
     }
 
     pub fn load(&mut self, ty: IrTy, ptr: Operand, align: u32) -> Operand {
-        Operand::Instruction(self.append_instruction(Instruction::Load { ty, ptr, align }))
+        Operand::Instruction(self.append_instruction(InstructionKind::Load { ty, ptr, align }))
     }
 
     pub fn store(&mut self, value: Operand, ptr: Operand, align: u32) {
-        self.append_instruction(Instruction::Store { value, ptr, align });
+        self.append_instruction(InstructionKind::Store { value, ptr, align });
     }
 
     pub fn get_element_ptr(
@@ -127,7 +154,7 @@ impl Builder {
         ptr: Operand,
         indices: Vec<Operand>,
     ) -> Operand {
-        Operand::Instruction(self.append_instruction(Instruction::GetElementPtr {
+        Operand::Instruction(self.append_instruction(InstructionKind::GetElementPtr {
             source_ty,
             ptr,
             indices,
@@ -135,11 +162,11 @@ impl Builder {
     }
 
     pub fn binary(&mut self, op: BinaryOp, lhs: Operand, rhs: Operand) -> Operand {
-        Operand::Instruction(self.append_instruction(Instruction::Binary { op, lhs, rhs }))
+        Operand::Instruction(self.append_instruction(InstructionKind::Binary { op, lhs, rhs }))
     }
 
     pub fn icmp(&mut self, predicate: IntPredicate, lhs: Operand, rhs: Operand) -> Operand {
-        Operand::Instruction(self.append_instruction(Instruction::ICmp {
+        Operand::Instruction(self.append_instruction(InstructionKind::ICmp {
             predicate,
             lhs,
             rhs,
@@ -147,13 +174,14 @@ impl Builder {
     }
 
     pub fn cast(&mut self, op: CastOp, value: Operand, to: IrTy) -> Operand {
-        Operand::Instruction(self.append_instruction(Instruction::Cast { op, value, to }))
+        Operand::Instruction(self.append_instruction(InstructionKind::Cast { op, value, to }))
     }
 
     pub fn call(&mut self, function: FunctionId, args: Vec<Operand>) -> Option<Operand> {
-        let has_result = self.module.functions[function.0 as usize].signature.result != IrTy::Void;
-        let id = self.append_instruction(Instruction::Call { function, args });
-        has_result.then_some(Operand::Instruction(id))
+        let id = self.append_instruction(InstructionKind::Call { function, args });
+        self.body().instructions[id.0 as usize]
+            .result_ty()
+            .map(|_| Operand::Instruction(id))
     }
 
     pub fn terminate(&mut self, terminator: Terminator) {

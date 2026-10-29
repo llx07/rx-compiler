@@ -71,12 +71,12 @@ pub enum Constant {
 }
 
 impl Constant {
-    pub fn ty(&self) -> IrTy {
+    pub fn ty(&self) -> &'static IrTy {
         match self {
-            Self::I1(_) => IrTy::I1,
-            Self::I8(_) => IrTy::I8,
-            Self::I32(_) => IrTy::I32,
-            Self::Null => IrTy::Ptr,
+            Self::I1(_) => &IrTy::I1,
+            Self::I8(_) => &IrTy::I8,
+            Self::I32(_) => &IrTy::I32,
+            Self::Null => &IrTy::Ptr,
         }
     }
 }
@@ -89,15 +89,15 @@ pub enum Operand {
 }
 
 impl Operand {
-    pub fn ty(&self, module: &Module, function: &Function) -> IrTy {
+    pub fn ty<'a>(&self, function: &'a Function) -> &'a IrTy {
         match self {
-            Self::Parameter(index) => function.signature.params[*index as usize].clone(),
+            Self::Parameter(index) => &function.signature.params[*index as usize],
             Self::Instruction(id) => function
                 .body
                 .as_ref()
                 .expect("instruction operand must belong to a function body")
                 .instructions[id.0 as usize]
-                .result_ty(module, function)
+                .result_ty()
                 .expect("instruction operand must have a result"),
             Self::Constant(constant) => constant.ty(),
         }
@@ -105,7 +105,13 @@ impl Operand {
 }
 
 #[derive(Debug)]
-pub enum Instruction {
+pub struct Instruction {
+    pub kind: InstructionKind,
+    result_ty: Option<IrTy>,
+}
+
+#[derive(Debug)]
+pub enum InstructionKind {
     Alloca {
         ty: IrTy,
         align: u32,
@@ -147,23 +153,8 @@ pub enum Instruction {
 }
 
 impl Instruction {
-    pub fn result_ty(&self, module: &Module, function: &Function) -> Option<IrTy> {
-        match self {
-            Self::Alloca { .. } | Self::GetElementPtr { .. } => Some(IrTy::Ptr),
-            Self::Load { ty, .. } => Some(ty.clone()),
-            Self::Store { .. } => None,
-            Self::Binary { lhs, .. } => Some(lhs.ty(module, function)),
-            Self::ICmp { .. } => Some(IrTy::I1),
-            Self::Cast { to, .. } => Some(to.clone()),
-            Self::Call { function, .. } => {
-                let result = &module.functions[function.0 as usize].signature.result;
-                if *result == IrTy::Void {
-                    None
-                } else {
-                    Some(result.clone())
-                }
-            }
-        }
+    pub fn result_ty(&self) -> Option<&IrTy> {
+        self.result_ty.as_ref()
     }
 }
 
