@@ -166,19 +166,19 @@ impl Builder {
     }
 
     pub fn neg(&mut self, value: Operand) -> Operand {
-        self.binary(BinaryOp::Sub, Operand::Constant(Constant::I32(0)), value)
+        self.binary(BinaryOp::Sub, Operand::const_i32(0), value)
     }
 
     pub fn not(&mut self, value: Operand) -> Operand {
         let function = &self.module.functions
             [self.current_function.expect("no function selected").0 as usize];
         let mask = match value.ty(function) {
-            IrTy::I1 => Constant::I1(true),
-            IrTy::I8 => Constant::I8(u8::MAX),
-            IrTy::I32 => Constant::I32(u32::MAX),
+            IrTy::I1 => Operand::const_i1(true),
+            IrTy::I8 => Operand::Constant(Constant::I8(u8::MAX)),
+            IrTy::I32 => Operand::const_i32(u32::MAX),
             _ => unreachable!("not requires an integer operand"),
         };
-        self.binary(BinaryOp::Xor, value, Operand::Constant(mask))
+        self.binary(BinaryOp::Xor, value, mask)
     }
 
     pub fn icmp(&mut self, predicate: IntPredicate, lhs: Operand, rhs: Operand) -> Operand {

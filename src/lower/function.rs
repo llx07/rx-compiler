@@ -1,7 +1,7 @@
 use crate::{
     frontend::ast::{self, CallExpr, Expr, UnaryOp},
     ir::{
-        BinaryOp, CastOp, Constant, FunctionId, IntPredicate, IrTy, Operand, Signature, Terminator,
+        BinaryOp, CastOp, FunctionId, IntPredicate, IrTy, Operand, Signature, Terminator,
     },
     semantic::{self, Adjustment, DefId, TypeDef, TypedConstKind},
 };
@@ -134,7 +134,7 @@ impl IrLowerer<'_> {
         Ok(())
     }
 
-    fn lower_expr(&mut self, expr: &ast::Expr) -> Result<LoweredExpr, ()> {
+    pub(super) fn lower_expr(&mut self, expr: &ast::Expr) -> Result<LoweredExpr, ()> {
         let mut lowered = match &expr.kind {
             ast::ExprKind::Literal(_) => self.lower_literal(expr.id),
             ast::ExprKind::Path(_) => self.lower_path(expr.id),
@@ -159,7 +159,7 @@ impl IrLowerer<'_> {
         if let Some(adjustment) = self.semantic.node_adjustment(expr.id) {
             for step in &adjustment.steps {
                 lowered = match step {
-                    Adjustment::Borrow { is_mut } => lowered.borrow(*is_mut),
+                    Adjustment::Borrow { is_mut } => lowered.borrow(*is_mut, self),
                     Adjustment::Deref => lowered.deref(self),
                     Adjustment::MaterializeTemporary => lowered.materialize(self),
                 };
@@ -172,10 +172,10 @@ impl IrLowerer<'_> {
         let ty = self.semantic.node_ty(id).unwrap().clone();
         let value = self.semantic.node_literal(id).unwrap();
         let constant = match ty {
-            semantic::Ty::Bool => Constant::I1(value != 0),
-            _ => Constant::I32(value as u32),
+            semantic::Ty::Bool => Operand::const_i1(value != 0),
+            _ => Operand::const_i32(value as u32),
         };
-        Ok(LoweredExpr::value(ty, Operand::Constant(constant)))
+        Ok(LoweredExpr::value(ty, constant))
     }
 
     fn lower_path(&mut self, id: ast::AstNodeId) -> Result<LoweredExpr, ()> {
@@ -185,15 +185,15 @@ impl IrLowerer<'_> {
                 let def = def_id.as_value_def(self.semantic).unwrap();
                 let value = self.semantic.node_const(def.ast_node_id.unwrap()).unwrap();
                 let constant = match value.kind {
-                    TypedConstKind::Bool => Constant::I1(value.value != 0),
-                    _ => Constant::I32(value.value as u32),
+                    TypedConstKind::Bool => Operand::const_i1(value.value != 0),
+                    _ => Operand::const_i32(value.value as u32),
                 };
                 LoweredExpr::value(
                     self.semantic
                         .node_ty(id)
                         .expect("expression must have a type")
                         .clone(),
-                    Operand::Constant(constant),
+                    constant,
                 )
             }
             DefId::Local(local) => self
@@ -242,7 +242,9 @@ impl IrLowerer<'_> {
                 LoweredExpr::value(self.semantic.node_ty(id).unwrap().clone(), value)
             }
             UnaryOp::Deref => operand.deref(self),
-            UnaryOp::Borrow | UnaryOp::BorrowMut => operand.borrow(unary.op == UnaryOp::BorrowMut),
+            UnaryOp::Borrow | UnaryOp::BorrowMut => {
+                operand.borrow(unary.op == UnaryOp::BorrowMut, self)
+            }
         };
 
         Ok(lowered)
@@ -257,7 +259,7 @@ impl IrLowerer<'_> {
 
         match binary.op {
             Op::And | Op::Or => return self.lower_short_circuit(id, binary),
-            Op::Eq | Op::Ne => return self.lower_equality(id, binary),
+            Op::Eq | Op::Ne => return self.lower_equality_expr(binary),
             _ => {}
         }
 
@@ -320,7 +322,7 @@ impl IrLowerer<'_> {
         if matches!(op, Op::Shl | Op::Shr) {
             rhs = self
                 .builder
-                .binary(BinaryOp::And, rhs, Operand::Constant(Constant::I32(31)));
+                .binary(BinaryOp::And, rhs, Operand::const_i32(31));
         }
         let op = match (op, signed) {
             (Op::Add, _) => BinaryOp::Add,
@@ -342,14 +344,6 @@ impl IrLowerer<'_> {
     }
 
     fn lower_short_circuit(
-        &mut self,
-        _id: ast::AstNodeId,
-        _binary: &ast::BinaryExpr,
-    ) -> Result<LoweredExpr, ()> {
-        todo!()
-    }
-
-    fn lower_equality(
         &mut self,
         _id: ast::AstNodeId,
         _binary: &ast::BinaryExpr,

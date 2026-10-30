@@ -36,6 +36,7 @@ impl LoweredExpr {
         &self.ty
     }
 
+    /// Returns the value operand, loading from storage if needed.
     pub(super) fn as_value(&self, lowerer: &mut IrLowerer<'_>) -> Operand {
         if self.kind == LoweredExprKind::Value {
             return self.operand;
@@ -45,13 +46,12 @@ impl LoweredExpr {
         lowerer.builder.load(ty, self.operand, align)
     }
 
-    pub(super) fn as_place(&self) -> Operand {
-        assert_eq!(
-            self.kind,
-            LoweredExprKind::Place,
-            "expected an existing place"
-        );
-        self.operand
+    /// Returns the storage address, materializing a value if needed.
+    pub(super) fn as_place(&self, lowerer: &mut IrLowerer<'_>) -> Operand {
+        match self.kind {
+            LoweredExprKind::Place => self.operand,
+            LoweredExprKind::Value => self.clone().materialize(lowerer).operand,
+        }
     }
 
     pub(super) fn materialize(self, lowerer: &mut IrLowerer<'_>) -> Self {
@@ -72,8 +72,16 @@ impl LoweredExpr {
         Self::place(ty, ptr)
     }
 
-    pub(super) fn borrow(self, is_mut: bool) -> Self {
-        let ptr = self.as_place();
+    /// Dereferences all outer reference and Box layers.
+    pub(super) fn deref_all(mut self, lowerer: &mut IrLowerer<'_>) -> Self {
+        while matches!(self.ty, Ty::Ref { .. } | Ty::Box(_)) {
+            self = self.deref(lowerer);
+        }
+        self
+    }
+
+    pub(super) fn borrow(self, is_mut: bool, lowerer: &mut IrLowerer<'_>) -> Self {
+        let ptr = self.as_place(lowerer);
         Self::value(
             Ty::Ref {
                 is_mut,

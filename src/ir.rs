@@ -90,6 +90,14 @@ pub enum Operand {
 }
 
 impl Operand {
+    pub fn const_i1(value: bool) -> Self {
+        Self::Constant(Constant::I1(value))
+    }
+
+    pub fn const_i32(value: u32) -> Self {
+        Self::Constant(Constant::I32(value))
+    }
+
     pub fn ty<'a>(&self, function: &'a Function) -> &'a IrTy {
         match self {
             Self::Void => &IrTy::Void,

@@ -421,7 +421,7 @@ pub enum LocalDefKind {
     Let,
     Receiver { ty: TypeId },
 }
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Ty {
     I32,
     U32,
