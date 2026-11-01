@@ -589,6 +589,40 @@ impl IrLowerer<'_> {
                     &call_expr.args[0],
                 );
             }
+            semantic::CallTarget::Builtin {
+                op: semantic::BuiltinOp::VecNew,
+                type_arg,
+            } => {
+                return self.lower_vec_new(type_arg.as_ref().expect("Vec has a type argument"));
+            }
+            semantic::CallTarget::Builtin {
+                op: semantic::BuiltinOp::VecLen,
+                ..
+            } => return self.lower_vec_len(&call_expr.args[0]),
+            semantic::CallTarget::Builtin {
+                op: semantic::BuiltinOp::VecIsEmpty,
+                ..
+            } => return self.lower_vec_is_empty(&call_expr.args[0]),
+            semantic::CallTarget::Builtin {
+                op: semantic::BuiltinOp::VecPush,
+                type_arg,
+            } => {
+                return self.lower_vec_push(
+                    type_arg.as_ref().expect("Vec has a type argument"),
+                    &call_expr.args[0],
+                    &call_expr.args[1],
+                );
+            }
+            semantic::CallTarget::Builtin {
+                op: semantic::BuiltinOp::VecRemove,
+                type_arg,
+            } => {
+                return self.lower_vec_remove(
+                    type_arg.as_ref().expect("Vec has a type argument"),
+                    &call_expr.args[0],
+                    &call_expr.args[1],
+                );
+            }
             semantic::CallTarget::Builtin { .. } => todo!(),
             semantic::CallTarget::User(def) => self.functions[def],
         };
@@ -615,6 +649,34 @@ impl IrLowerer<'_> {
         let target = self.semantic.node_call(id).unwrap();
         let function_id = match &target.target {
             semantic::CallTarget::User(def) => self.functions[def],
+            semantic::CallTarget::Builtin {
+                op: semantic::BuiltinOp::VecLen,
+                ..
+            } => return self.lower_vec_len(&call.receiver),
+            semantic::CallTarget::Builtin {
+                op: semantic::BuiltinOp::VecIsEmpty,
+                ..
+            } => return self.lower_vec_is_empty(&call.receiver),
+            semantic::CallTarget::Builtin {
+                op: semantic::BuiltinOp::VecPush,
+                type_arg,
+            } => {
+                return self.lower_vec_push(
+                    type_arg.as_ref().expect("Vec has a type argument"),
+                    &call.receiver,
+                    &call.args[0],
+                );
+            }
+            semantic::CallTarget::Builtin {
+                op: semantic::BuiltinOp::VecRemove,
+                type_arg,
+            } => {
+                return self.lower_vec_remove(
+                    type_arg.as_ref().expect("Vec has a type argument"),
+                    &call.receiver,
+                    &call.args[0],
+                );
+            }
             semantic::CallTarget::Builtin { .. } => todo!(),
         };
 

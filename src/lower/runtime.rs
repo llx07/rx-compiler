@@ -5,6 +5,19 @@ use crate::{
 
 use super::IrLowerer;
 
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub(super) enum RuntimeFunction {
+    Alloc,
+    Memcpy,
+    Memmove,
+    Memset,
+    VecNew,
+    VecLen,
+    VecIsEmpty,
+    VecPush,
+    VecRemove,
+}
+
 impl IrLowerer<'_> {
     pub(super) fn wrap_main(&mut self) {
         let source_main = self.main_func.expect("source main must be declared");
@@ -39,13 +52,67 @@ impl IrLowerer<'_> {
             self.functions.insert(DefId::GlobalValue(value), id);
         }
 
-        // The allocator is a runtime helper, not a source-visible value.
-        self.alloc_func = Some(self.builder.declare_function(
-            "__rx_alloc".into(),
-            Signature {
-                params: vec![IrTy::I32, IrTy::I32],
-                result: IrTy::Ptr,
-            },
-        ));
+        // Runtime helpers are not source-visible values.
+        for (function, name, params, result) in [
+            (
+                RuntimeFunction::Alloc,
+                "__rx_alloc",
+                vec![IrTy::I32, IrTy::I32],
+                IrTy::Ptr,
+            ),
+            (
+                RuntimeFunction::Memcpy,
+                "memcpy",
+                vec![IrTy::Ptr, IrTy::Ptr, IrTy::I32],
+                IrTy::Ptr,
+            ),
+            (
+                RuntimeFunction::Memmove,
+                "memmove",
+                vec![IrTy::Ptr, IrTy::Ptr, IrTy::I32],
+                IrTy::Ptr,
+            ),
+            (
+                RuntimeFunction::Memset,
+                "memset",
+                vec![IrTy::Ptr, IrTy::I32, IrTy::I32],
+                IrTy::Ptr,
+            ),
+            (
+                RuntimeFunction::VecNew,
+                "__rx_vec_new",
+                vec![IrTy::Ptr],
+                IrTy::Void,
+            ),
+            (
+                RuntimeFunction::VecLen,
+                "__rx_vec_len",
+                vec![IrTy::Ptr],
+                IrTy::I32,
+            ),
+            (
+                RuntimeFunction::VecIsEmpty,
+                "__rx_vec_is_empty",
+                vec![IrTy::Ptr],
+                IrTy::I32,
+            ),
+            (
+                RuntimeFunction::VecPush,
+                "__rx_vec_push",
+                vec![IrTy::Ptr, IrTy::Ptr, IrTy::I32],
+                IrTy::Void,
+            ),
+            (
+                RuntimeFunction::VecRemove,
+                "__rx_vec_remove",
+                vec![IrTy::Ptr, IrTy::I32, IrTy::Ptr, IrTy::I32],
+                IrTy::Void,
+            ),
+        ] {
+            let id = self
+                .builder
+                .declare_function(name.into(), Signature { params, result });
+            self.runtime_functions.insert(function, id);
+        }
     }
 }

@@ -4,8 +4,11 @@ mod expr;
 mod function;
 mod runtime;
 mod ty;
+mod vec_ty;
 
 use std::collections::HashMap;
+
+use self::runtime::RuntimeFunction;
 
 use crate::{
     frontend::ast,
@@ -30,7 +33,7 @@ struct IrLowerer<'a> {
     pending_equality: Vec<(Ty, FunctionId)>,
     vec_struct: Option<StructId>,
     main_func: Option<FunctionId>,
-    alloc_func: Option<FunctionId>,
+    runtime_functions: HashMap<RuntimeFunction, FunctionId>,
 }
 
 impl IrLowerer<'_> {
@@ -89,7 +92,7 @@ pub fn lower(krate: &ast::Crate, semantic: &SemanticCtx) -> ir::Module {
         pending_equality: Vec::new(),
         vec_struct: None,
         main_func: None,
-        alloc_func: None,
+        runtime_functions: HashMap::new(),
     }
     .lower_krate(krate)
 }
