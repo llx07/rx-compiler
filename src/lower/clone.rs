@@ -66,22 +66,14 @@ impl IrLowerer<'_> {
                 let TypeDef::Struct(structure) = self.semantic.get_type_def(*type_id) else {
                     unreachable!("struct type must refer to a struct definition")
                 };
-                let original = original.as_place(self);
+                let target = LoweredExpr::place(ty.clone(), cloned_ptr);
 
                 for (index, field) in structure.fields.iter() {
-                    let source = self.builder.get_element_ptr(
-                        ir_ty.clone(),
-                        original,
-                        vec![Operand::const_i32(0), Operand::const_i32(index.into())],
-                    );
-                    let source_place =
-                        LoweredExpr::place(field.ty.as_ref().unwrap().clone(), source);
-                    let field_ptr = self.builder.get_element_ptr(
-                        ir_ty.clone(),
-                        cloned_ptr,
-                        vec![Operand::const_i32(0), Operand::const_i32(index.into())],
-                    );
-                    let field_value = self.lower_clone(source_place).as_value(self);
+                    let field_ty = field.ty.as_ref().unwrap();
+                    let source = original.field(index.into(), field_ty.clone(), self);
+                    let destination = target.field(index.into(), field_ty.clone(), self);
+                    let field_value = self.lower_clone(source).as_value(self);
+                    let field_ptr = destination.as_place(self);
                     self.builder.store(field_value, field_ptr);
                 }
 

@@ -101,21 +101,15 @@ impl IrLowerer<'_> {
                         Operand::const_i32(*len as u32),
                     ),
                     Ty::Vec(_) => {
-                        let ir_ty = self.lower_ty(ty.clone());
                         let [(lhs, len), (rhs, rhs_len)] =
                             [Operand::Parameter(0), Operand::Parameter(1)].map(|ptr| {
-                                let data_ptr = self.builder.get_element_ptr(
-                                    ir_ty.clone(),
-                                    ptr,
-                                    vec![Operand::const_i32(0), Operand::const_i32(0)],
-                                );
-                                let len_ptr = self.builder.get_element_ptr(
-                                    ir_ty.clone(),
-                                    ptr,
-                                    vec![Operand::const_i32(0), Operand::const_i32(1)],
-                                );
-                                let data = self.builder.load(IrTy::Ptr, data_ptr);
-                                let len = self.builder.load(IrTy::I32, len_ptr);
+                                let value = LoweredExpr::place(ty.clone(), ptr);
+                                let data_ty = Ty::Ref {
+                                    is_mut: false,
+                                    inner: elem.clone(),
+                                };
+                                let data = value.field(0, data_ty, self).as_value(self);
+                                let len = value.field(1, Ty::USize, self).as_value(self);
                                 (data, len)
                             });
                         // comparing their length before
@@ -179,19 +173,11 @@ impl IrLowerer<'_> {
                     .iter()
                     .map(|(_, field)| field.ty.as_ref().unwrap().clone())
                     .collect::<Vec<_>>();
-                let ir_ty = self.lower_ty(ty.clone());
+                let lhs = LoweredExpr::place(ty.clone(), Operand::Parameter(0));
+                let rhs = LoweredExpr::place(ty.clone(), Operand::Parameter(1));
                 for (index, field_ty) in fields.into_iter().enumerate() {
-                    let indices = vec![Operand::const_i32(0), Operand::const_i32(index as u32)];
-                    let lhs = self.builder.get_element_ptr(
-                        ir_ty.clone(),
-                        Operand::Parameter(0),
-                        indices.clone(),
-                    );
-                    let rhs =
-                        self.builder
-                            .get_element_ptr(ir_ty.clone(), Operand::Parameter(1), indices);
-                    let lhs = LoweredExpr::place(field_ty.clone(), lhs);
-                    let rhs = LoweredExpr::place(field_ty, rhs);
+                    let lhs = lhs.field(index as u32, field_ty.clone(), self);
+                    let rhs = rhs.field(index as u32, field_ty, self);
                     let equal = self
                         .lower_equality(ast::BinaryOp::Eq, lhs, rhs)
                         .as_value(self);

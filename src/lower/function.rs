@@ -505,16 +505,16 @@ impl IrLowerer<'_> {
         let ir_ty = self.lower_ty(ty.clone());
         let base = match base.ty() {
             Ty::Array { .. } => base.as_place(self),
-            Ty::Vec(_) => {
-                let vec_ty = self.lower_ty(base.ty().clone());
-                let base = base.as_place(self);
-                let data_ptr = self.builder.get_element_ptr(
-                    vec_ty,
-                    base,
-                    vec![Operand::const_i32(0), Operand::const_i32(0)],
-                );
-                self.builder.load(IrTy::Ptr, data_ptr)
-            }
+            Ty::Vec(_) => base
+                .field(
+                    0,
+                    Ty::Ref {
+                        is_mut: false,
+                        inner: Box::new(ty.clone()),
+                    },
+                    self,
+                )
+                .as_value(self),
             _ => unreachable!("base of index must resolve to an array or Vec"),
         };
         let ptr = self.builder.get_element_ptr(ir_ty, base, vec![index]);
@@ -529,22 +529,21 @@ impl IrLowerer<'_> {
         let ty = self.semantic.node_ty(id).unwrap().clone();
         let ir_ty = self.lower_ty(ty.clone());
         let ptr = self.builder.alloca_in_entry(ir_ty.clone());
+        let result = LoweredExpr::place(ty, ptr);
 
         for initializer in &structure.fields {
             let DefId::Field { field, .. } = self.semantic.node_def(initializer.id).unwrap() else {
                 unreachable!("struct initializer must resolve to a field")
             };
             let value = self.lower_expr(&initializer.value)?;
+            let field_ptr = result
+                .field(field.into(), value.ty().clone(), self)
+                .as_place(self);
             let value = value.as_value(self);
-            let field_ptr = self.builder.get_element_ptr(
-                ir_ty.clone(),
-                ptr,
-                vec![Operand::const_i32(0), Operand::const_i32(field.into())],
-            );
             self.builder.store(value, field_ptr);
         }
 
-        Ok(LoweredExpr::place(ty, ptr))
+        Ok(result)
     }
 
     fn lower_call(&mut self, id: ast::AstNodeId, call_expr: &CallExpr) -> Result<LoweredExpr, ()> {
@@ -701,19 +700,13 @@ impl IrLowerer<'_> {
         field: &ast::FieldExpr,
     ) -> Result<LoweredExpr, ()> {
         let base = self.lower_expr(&field.base)?;
-        let DefId::Field { owner, field } = self.semantic.node_def(id).unwrap() else {
+        let DefId::Field { field, .. } = self.semantic.node_def(id).unwrap() else {
             unreachable!("field access must resolve to a field")
         };
-        let ir_ty = self.lower_ty(Ty::Struct(owner));
-        let base = base.as_place(self);
-        let ptr = self.builder.get_element_ptr(
-            ir_ty,
-            base,
-            vec![Operand::const_i32(0), Operand::const_i32(field.into())],
-        );
-        Ok(LoweredExpr::place(
+        Ok(base.field(
+            field.into(),
             self.semantic.node_ty(id).unwrap().clone(),
-            ptr,
+            self,
         ))
     }
 

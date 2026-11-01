@@ -36,6 +36,17 @@ impl LoweredExpr {
         &self.ty
     }
 
+    pub(super) fn field(&self, index: u32, field_ty: Ty, lowerer: &mut IrLowerer<'_>) -> Self {
+        let ir_ty = lowerer.lower_ty(self.ty.clone());
+        let ptr = self.as_place(lowerer);
+        let ptr = lowerer.builder.get_element_ptr(
+            ir_ty,
+            ptr,
+            vec![Operand::const_i32(0), Operand::const_i32(index)],
+        );
+        Self::place(field_ty, ptr)
+    }
+
     /// Returns the value operand, loading from storage if needed.
     pub(super) fn as_value(&self, lowerer: &mut IrLowerer<'_>) -> Operand {
         if self.kind == LoweredExprKind::Value {
