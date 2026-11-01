@@ -6,6 +6,30 @@ use crate::{
 use super::IrLowerer;
 
 impl IrLowerer<'_> {
+    /// Returns the storage size in bytes for RV32, including aggregate padding.
+    pub(super) fn size_of(&self, ty: &Ty) -> u32 {
+        match ty {
+            Ty::Unit | Ty::Never => 0,
+            Ty::Bool => 1,
+            Ty::I32 | Ty::U32 | Ty::ISize | Ty::USize | Ty::Ref { .. } | Ty::Box(_) => 4,
+            Ty::Vec(_) => 12,
+            Ty::Array { elem, len } => self.size_of(elem) * *len as u32,
+            Ty::Struct(type_id) => {
+                let TypeDef::Struct(structure) = self.semantic.get_type_def(*type_id) else {
+                    unreachable!("struct type must refer to a struct definition")
+                };
+                let mut size = 0u32;
+                for (_, field) in structure.fields.iter() {
+                    let ty = field.ty.as_ref().expect("field type must be resolved");
+                    let align = self.align_of(ty);
+                    size = size.div_ceil(align) * align + self.size_of(ty);
+                }
+                let align = self.align_of(ty);
+                size.div_ceil(align) * align
+            }
+        }
+    }
+
     /// Returns the natural storage alignment in bytes for RV32.
     pub(super) fn align_of(&self, ty: &Ty) -> u32 {
         match ty {

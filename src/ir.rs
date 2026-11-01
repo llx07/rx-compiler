@@ -124,17 +124,14 @@ pub struct Instruction {
 pub enum InstructionKind {
     Alloca {
         ty: IrTy,
-        align: u32,
     },
     Load {
         ty: IrTy,
         ptr: Operand,
-        align: u32,
     },
     Store {
         value: Operand,
         ptr: Operand,
-        align: u32,
     },
     GetElementPtr {
         source_ty: IrTy,

@@ -124,8 +124,6 @@ impl IrLowerer<'_> {
 
         match ty {
             Ty::Array { elem, .. } | Ty::Vec(elem) => {
-                let align = self.align_of(&Ty::USize);
-
                 let (lhs_data, rhs_data, len) = match ty {
                     Ty::Array { len, .. } => (
                         Operand::Parameter(0),
@@ -146,8 +144,8 @@ impl IrLowerer<'_> {
                                     ptr,
                                     vec![Operand::const_i32(0), Operand::const_i32(1)],
                                 );
-                                let data = self.builder.load(IrTy::Ptr, data_ptr, align);
-                                let len = self.builder.load(IrTy::I32, len_ptr, align);
+                                let data = self.builder.load(IrTy::Ptr, data_ptr);
+                                let len = self.builder.load(IrTy::I32, len_ptr);
                                 (data, len)
                             });
                         // comparing their length before
@@ -164,8 +162,8 @@ impl IrLowerer<'_> {
                     _ => unreachable!(),
                 };
 
-                let index_ptr = self.builder.alloca_in_entry(IrTy::I32, align);
-                self.builder.store(Operand::const_i32(0), index_ptr, align);
+                let index_ptr = self.builder.alloca_in_entry(IrTy::I32);
+                self.builder.store(Operand::const_i32(0), index_ptr);
 
                 let condition = self.builder.create_block();
                 let body = self.builder.create_block();
@@ -173,7 +171,7 @@ impl IrLowerer<'_> {
                 self.builder.terminate(Terminator::Br(condition));
 
                 self.builder.position_at_end(condition);
-                let index = self.builder.load(IrTy::I32, index_ptr, align);
+                let index = self.builder.load(IrTy::I32, index_ptr);
                 let in_bounds = self.builder.icmp(IntPredicate::Ult, index, len);
                 self.builder.terminate(Terminator::CondBr {
                     condition: in_bounds,
@@ -195,7 +193,7 @@ impl IrLowerer<'_> {
                 let index =
                     self.builder
                         .binary(crate::ir::BinaryOp::Add, index, Operand::const_i32(1));
-                self.builder.store(index, index_ptr, align);
+                self.builder.store(index, index_ptr);
                 self.builder.terminate(Terminator::CondBr {
                     condition: equal,
                     then_block: condition,

@@ -87,22 +87,16 @@ fn emit_inst(
         write!(out, "%v{} = ", id.0).unwrap();
     }
     match &inst.kind {
-        InstructionKind::Alloca { ty, align } => {
-            write!(out, "alloca {}, align {align}", format_ty(ty)).unwrap();
+        InstructionKind::Alloca { ty } => {
+            write!(out, "alloca {}", format_ty(ty)).unwrap();
         }
-        InstructionKind::Load { ty, ptr, align } => {
+        InstructionKind::Load { ty, ptr } => {
+            write!(out, "load {}, ptr {}", format_ty(ty), format_operand(*ptr)).unwrap();
+        }
+        InstructionKind::Store { value, ptr } => {
             write!(
                 out,
-                "load {}, ptr {}, align {align}",
-                format_ty(ty),
-                format_operand(*ptr)
-            )
-            .unwrap();
-        }
-        InstructionKind::Store { value, ptr, align } => {
-            write!(
-                out,
-                "store {}, ptr {}, align {align}",
+                "store {}, ptr {}",
                 format_typed_operand(*value, function),
                 format_operand(*ptr)
             )

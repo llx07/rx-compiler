@@ -126,12 +126,12 @@ impl Builder {
         self.current_block_id = Some(block);
     }
 
-    pub fn alloca(&mut self, ty: IrTy, align: u32) -> Operand {
-        Operand::Instruction(self.append_instruction(InstructionKind::Alloca { ty, align }))
+    pub fn alloca(&mut self, ty: IrTy) -> Operand {
+        Operand::Instruction(self.append_instruction(InstructionKind::Alloca { ty }))
     }
 
-    pub fn alloca_in_entry(&mut self, ty: IrTy, align: u32) -> Operand {
-        let inst = self.build_instruction(InstructionKind::Alloca { ty, align });
+    pub fn alloca_in_entry(&mut self, ty: IrTy) -> Operand {
+        let inst = self.build_instruction(InstructionKind::Alloca { ty });
         let body = self.body_mut();
         let entry = body.blocks.first_mut().expect("entry block must exist");
         let id = InstId(body.instructions.len() as u32);
@@ -140,12 +140,12 @@ impl Builder {
         Operand::Instruction(id)
     }
 
-    pub fn load(&mut self, ty: IrTy, ptr: Operand, align: u32) -> Operand {
-        Operand::Instruction(self.append_instruction(InstructionKind::Load { ty, ptr, align }))
+    pub fn load(&mut self, ty: IrTy, ptr: Operand) -> Operand {
+        Operand::Instruction(self.append_instruction(InstructionKind::Load { ty, ptr }))
     }
 
-    pub fn store(&mut self, value: Operand, ptr: Operand, align: u32) {
-        self.append_instruction(InstructionKind::Store { value, ptr, align });
+    pub fn store(&mut self, value: Operand, ptr: Operand) {
+        self.append_instruction(InstructionKind::Store { value, ptr });
     }
 
     pub fn get_element_ptr(
@@ -170,8 +170,8 @@ impl Builder {
     }
 
     pub fn not(&mut self, value: Operand) -> Operand {
-        let function = &self.module.functions
-            [self.current_function.expect("no function selected").0 as usize];
+        let function =
+            &self.module.functions[self.current_function.expect("no function selected").0 as usize];
         let mask = match value.ty(function) {
             IrTy::I1 => Operand::const_i1(true),
             IrTy::I8 => Operand::Constant(Constant::I8(u8::MAX)),

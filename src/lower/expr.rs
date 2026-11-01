@@ -42,8 +42,7 @@ impl LoweredExpr {
             return self.operand;
         }
         let ty = lowerer.lower_ty(self.ty.clone());
-        let align = lowerer.align_of(&self.ty);
-        lowerer.builder.load(ty, self.operand, align)
+        lowerer.builder.load(ty, self.operand)
     }
 
     /// Returns the storage address, materializing a value if needed.
@@ -56,10 +55,9 @@ impl LoweredExpr {
 
     pub(super) fn materialize(self, lowerer: &mut IrLowerer<'_>) -> Self {
         let operand = self.as_value(lowerer);
-        let align = lowerer.align_of(&self.ty);
         let ty = lowerer.lower_ty(self.ty.clone());
-        let ptr = lowerer.builder.alloca_in_entry(ty, align);
-        lowerer.builder.store(operand, ptr, align);
+        let ptr = lowerer.builder.alloca_in_entry(ty);
+        lowerer.builder.store(operand, ptr);
         Self::place(self.ty, ptr)
     }
 

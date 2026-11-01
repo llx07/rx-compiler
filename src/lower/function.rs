@@ -93,11 +93,9 @@ impl IrLowerer<'_> {
             let DefId::Local(local_id) = self.semantic.node_def(id).unwrap() else {
                 unreachable!("param is local binding");
             };
-            let align = self.align_of(source_ty);
             let ty = self.lower_ty(source_ty.clone());
-            let ptr = self.builder.alloca_in_entry(ty, align);
-            self.builder
-                .store(Operand::Parameter(index as u32), ptr, align);
+            let ptr = self.builder.alloca_in_entry(ty);
+            self.builder.store(Operand::Parameter(index as u32), ptr);
             self.locals
                 .insert(local_id, LoweredExpr::place(source_ty.clone(), ptr));
         }
@@ -113,18 +111,16 @@ impl IrLowerer<'_> {
     fn lower_let_stmt(&mut self, stmt: &ast::LetStmt) -> Result<(), ()> {
         let ty = self.semantic.node_ty(stmt.id).unwrap();
         let value = self.lower_expr(&stmt.expr)?;
-        let align = self.align_of(ty);
         let def_id = self.semantic.node_def(stmt.id).unwrap();
         let DefId::Local(local_id) = def_id else {
             unreachable!("let stmt is local binding");
         };
         let ir_ty = self.lower_ty(ty.clone());
-
-        let ptr = self.builder.alloca_in_entry(ir_ty, align);
+        let ptr = self.builder.alloca_in_entry(ir_ty);
 
         debug_assert_eq!(value.ty(), ty);
         let operand = value.as_value(self);
-        self.builder.store(operand, ptr, align);
+        self.builder.store(operand, ptr);
 
         self.locals
             .insert(local_id, LoweredExpr::place(ty.clone(), ptr));
@@ -342,12 +338,10 @@ impl IrLowerer<'_> {
     }
 
     fn lower_short_circuit(&mut self, binary: &ast::BinaryExpr) -> Result<LoweredExpr, ()> {
-        let align = self.align_of(&Ty::Bool);
-
         let lhs = self.lower_expr(&binary.lhs)?;
-        let result = self.builder.alloca_in_entry(self.lower_ty(Ty::Bool), align);
+        let result = self.builder.alloca_in_entry(self.lower_ty(Ty::Bool));
         let lhs_value = lhs.as_value(self);
-        self.builder.store(lhs_value, result, align);
+        self.builder.store(lhs_value, result);
 
         let cond = match binary.op {
             ast::BinaryOp::And => self.builder.not(lhs_value),
@@ -367,14 +361,14 @@ impl IrLowerer<'_> {
         self.builder.position_at_end(rhs_block);
         if let Ok(rhs) = self.lower_expr(&binary.rhs) {
             let rhs_value = rhs.as_value(self);
-            self.builder.store(rhs_value, result, align);
+            self.builder.store(rhs_value, result);
             self.builder.terminate(Terminator::Br(merge_block));
         }
 
         self.builder.position_at_end(merge_block);
         Ok(LoweredExpr::value(
             Ty::Bool,
-            self.builder.load(IrTy::I1, result, align),
+            self.builder.load(IrTy::I1, result),
         ))
     }
 
@@ -385,7 +379,6 @@ impl IrLowerer<'_> {
         let rhs = LoweredExpr::value(rhs.ty().clone(), rhs.as_value(self));
         let lhs = self.lower_expr(&assign.lhs)?;
         let place = lhs.as_place(self);
-        let align = self.align_of(lhs.ty());
 
         let result = match assign.op {
             Op::Assign => rhs.as_value(self),
@@ -415,7 +408,7 @@ impl IrLowerer<'_> {
             }
         };
 
-        self.builder.store(result, place, align);
+        self.builder.store(result, place);
         self.lower_unit()
     }
 
@@ -443,12 +436,11 @@ impl IrLowerer<'_> {
         array: &ast::ArrayExpr,
     ) -> Result<LoweredExpr, ()> {
         let ty = self.semantic.node_ty(id).unwrap().clone();
-        let Ty::Array { elem, len } = &ty else {
+        let Ty::Array { len, .. } = &ty else {
             unreachable!("array expression must have an array type")
         };
         let ir_ty = self.lower_ty(ty.clone());
-        let align = self.align_of(elem);
-        let ptr = self.builder.alloca_in_entry(ir_ty.clone(), align);
+        let ptr = self.builder.alloca_in_entry(ir_ty.clone());
 
         match array {
             ast::ArrayExpr::Elements(elements) => {
@@ -459,7 +451,7 @@ impl IrLowerer<'_> {
                         ptr,
                         vec![Operand::const_i32(0), Operand::const_i32(index as u32)],
                     );
-                    self.builder.store(value, element_ptr, align);
+                    self.builder.store(value, element_ptr);
                 }
             }
             ast::ArrayExpr::Repeat { value, .. } => {
@@ -470,17 +462,17 @@ impl IrLowerer<'_> {
                         ptr,
                         vec![Operand::const_i32(0), Operand::const_i32(0)],
                     );
-                    self.builder.store(value, element_ptr, align);
+                    self.builder.store(value, element_ptr);
                 } else {
-                    let index_ptr = self.builder.alloca_in_entry(IrTy::I32, 4);
-                    self.builder.store(Operand::const_i32(0), index_ptr, 4);
+                    let index_ptr = self.builder.alloca_in_entry(IrTy::I32);
+                    self.builder.store(Operand::const_i32(0), index_ptr);
                     let condition = self.builder.create_block();
                     let body = self.builder.create_block();
                     let end = self.builder.create_block();
                     self.builder.terminate(Terminator::Br(condition));
 
                     self.builder.position_at_end(condition);
-                    let index = self.builder.load(IrTy::I32, index_ptr, 4);
+                    let index = self.builder.load(IrTy::I32, index_ptr);
                     let in_bounds = self.builder.icmp(
                         IntPredicate::Ult,
                         index,
@@ -498,11 +490,11 @@ impl IrLowerer<'_> {
                         ptr,
                         vec![Operand::const_i32(0), index],
                     );
-                    self.builder.store(value, element_ptr, align);
+                    self.builder.store(value, element_ptr);
                     let next = self
                         .builder
                         .binary(BinaryOp::Add, index, Operand::const_i32(1));
-                    self.builder.store(next, index_ptr, 4);
+                    self.builder.store(next, index_ptr);
                     self.builder.terminate(Terminator::Br(condition));
                     self.builder.position_at_end(end);
                 }
@@ -526,14 +518,13 @@ impl IrLowerer<'_> {
             Ty::Array { .. } => base.as_place(self),
             Ty::Vec(_) => {
                 let vec_ty = self.lower_ty(base.ty().clone());
-                let align = self.align_of(base.ty());
                 let base = base.as_place(self);
                 let data_ptr = self.builder.get_element_ptr(
                     vec_ty,
                     base,
                     vec![Operand::const_i32(0), Operand::const_i32(0)],
                 );
-                self.builder.load(IrTy::Ptr, data_ptr, align)
+                self.builder.load(IrTy::Ptr, data_ptr)
             }
             _ => unreachable!("base of index must resolve to an array or Vec"),
         };
@@ -548,23 +539,20 @@ impl IrLowerer<'_> {
     ) -> Result<LoweredExpr, ()> {
         let ty = self.semantic.node_ty(id).unwrap().clone();
         let ir_ty = self.lower_ty(ty.clone());
-        let ptr = self
-            .builder
-            .alloca_in_entry(ir_ty.clone(), self.align_of(&ty));
+        let ptr = self.builder.alloca_in_entry(ir_ty.clone());
 
         for initializer in &structure.fields {
             let DefId::Field { field, .. } = self.semantic.node_def(initializer.id).unwrap() else {
                 unreachable!("struct initializer must resolve to a field")
             };
             let value = self.lower_expr(&initializer.value)?;
-            let align = self.align_of(value.ty());
             let value = value.as_value(self);
             let field_ptr = self.builder.get_element_ptr(
                 ir_ty.clone(),
                 ptr,
                 vec![Operand::const_i32(0), Operand::const_i32(field.into())],
             );
-            self.builder.store(value, field_ptr, align);
+            self.builder.store(value, field_ptr);
         }
 
         Ok(LoweredExpr::place(ty, ptr))
@@ -672,7 +660,7 @@ impl IrLowerer<'_> {
 
                 let body_block = self.builder.create_block();
                 let exit = self.builder.create_block();
-                
+
                 self.builder.terminate(Terminator::CondBr {
                     condition,
                     then_block: body_block,
@@ -714,7 +702,6 @@ impl IrLowerer<'_> {
             unreachable!("break must target a loop")
         };
         let ty = self.semantic.node_ty(target).unwrap().clone();
-        let align = self.align_of(&ty);
 
         let info = self.loop_info.get_mut(&target).unwrap();
         let exit = *info.exit.get_or_insert_with(|| self.builder.create_block());
@@ -724,8 +711,8 @@ impl IrLowerer<'_> {
             let info = self.loop_info.get_mut(&target).unwrap();
             let ptr = *info
                 .result
-                .get_or_insert_with(|| self.builder.alloca_in_entry(ir_ty, align));
-            self.builder.store(value, ptr, align);
+                .get_or_insert_with(|| self.builder.alloca_in_entry(ir_ty));
+            self.builder.store(value, ptr);
         }
         self.builder.terminate(Terminator::Br(exit));
         Err(())
@@ -744,7 +731,6 @@ impl IrLowerer<'_> {
         let condition = self.lower_expr(&expr.condition)?.as_value(self);
 
         let ty = self.semantic.node_ty(id).unwrap().clone();
-        let align = self.align_of(&ty);
 
         let then_block = self.builder.create_block();
         let else_block = expr
@@ -776,11 +762,10 @@ impl IrLowerer<'_> {
                 let merge = *merge_block.get_or_insert_with(|| self.builder.create_block());
                 if ty != Ty::Unit {
                     let ptr = *result.get_or_insert_with(|| {
-                        self.builder
-                            .alloca_in_entry(self.lower_ty(ty.clone()), align)
+                        self.builder.alloca_in_entry(self.lower_ty(ty.clone()))
                     });
                     let value = value.as_value(self);
-                    self.builder.store(value, ptr, align);
+                    self.builder.store(value, ptr);
                 }
                 self.builder.terminate(Terminator::Br(merge));
             }
