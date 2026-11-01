@@ -44,6 +44,13 @@ void __rx_vec_new(void *vec) {
   v->capacity = 0;
 }
 
+void __rx_vec_new_with_size(void *vec, uint32_t size, uint32_t element_size) {
+  struct rx_vec *v = vec;
+  v->data = size ? __rx_alloc(size * element_size, 4) : 0;
+  v->len = size;
+  v->capacity = size;
+}
+
 uint32_t __rx_vec_len(const void *vec) {
   const struct rx_vec *v = vec;
   return v->len;

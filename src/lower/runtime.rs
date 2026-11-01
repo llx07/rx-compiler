@@ -12,6 +12,7 @@ pub(super) enum RuntimeFunction {
     Memmove,
     Memset,
     VecNew,
+    VecNewWithSize,
     VecLen,
     VecIsEmpty,
     VecPush,
@@ -82,6 +83,12 @@ impl IrLowerer<'_> {
                 RuntimeFunction::VecNew,
                 "__rx_vec_new",
                 vec![IrTy::Ptr],
+                IrTy::Void,
+            ),
+            (
+                RuntimeFunction::VecNewWithSize,
+                "__rx_vec_new_with_size",
+                vec![IrTy::Ptr, IrTy::I32, IrTy::I32],
                 IrTy::Void,
             ),
             (
