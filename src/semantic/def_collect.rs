@@ -19,7 +19,6 @@ impl<'a> Visitor for DefCollector<'a> {
         match self.ctx.define_value(
             name.clone(),
             ValueDef {
-                name: name.clone(),
                 ast_node_id: Some(node.id),
                 span: Some(node.span.clone()),
                 kind: ValueDefKind::Function(FunctionDef { sig: None }),
@@ -41,7 +40,6 @@ impl<'a> Visitor for DefCollector<'a> {
         match self.ctx.define_value(
             name.clone(),
             ValueDef {
-                name: name.clone(),
                 ast_node_id: Some(node.id),
                 span: Some(node.span.clone()),
                 kind: ValueDefKind::Const,
@@ -69,7 +67,6 @@ impl<'a> Visitor for DefCollector<'a> {
                     FieldDef {
                         name: name.clone(),
                         ast_node_id: field.id,
-                        span: field.span.clone(),
                         ty: None,
                     },
                 )
@@ -95,7 +92,6 @@ impl<'a> Visitor for DefCollector<'a> {
 
         let structure = TypeDef::Struct(StructDef {
             name: name.clone(),
-            ast_node_id: node.id,
             span: node.span.clone(),
             fields,
             traits,
@@ -159,7 +155,6 @@ fn collect_impls(ast: &Crate, ctx: &mut SemanticCtx, diagnostics: &mut Vec<Diagn
             let result = ctx.get_type_def_mut(target).associated_values_mut().define(
                 name.name.clone(),
                 ValueDef {
-                    name: name.name.clone(),
                     ast_node_id: Some(ast_node_id),
                     span: Some(span.clone()),
                     kind,

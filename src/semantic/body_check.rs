@@ -6,13 +6,6 @@ use crate::{
     semantic::{visitor::Visitor, *},
 };
 
-#[derive(Debug, Clone, Copy)]
-enum PlaceUse {
-    AssignTarget,
-    Borrow { is_mut: bool },
-    ProjectionBase,
-    Receiver { is_mut: bool },
-}
 #[derive(Debug, Clone)]
 struct MethodCandidate {
     call: ResolvedCall,
@@ -47,16 +40,11 @@ struct LoopFrame {
     breaks: Vec<BreakValue>,
 }
 
-struct FunctionContext {
-    id: AstNodeId,
-    return_ty: Ty,
-}
-
 pub struct BodyChecker<'a> {
     ctx: &'a mut SemanticCtx,
     diagnostics: &'a mut Vec<Diagnostic>,
 
-    current_function: Option<FunctionContext>,
+    current_return_ty: Option<Ty>,
     loop_stack: Vec<LoopFrame>,
 }
 
@@ -120,12 +108,9 @@ impl BodyChecker<'_> {
             .result
             .clone();
 
-        debug_assert!(self.current_function.is_none());
+        debug_assert!(self.current_return_ty.is_none());
 
-        self.current_function = Some(FunctionContext {
-            id: function.id,
-            return_ty: expect_ty.clone(),
-        });
+        self.current_return_ty = Some(expect_ty.clone());
 
         for param in &function.params {
             let local_def = self
@@ -157,7 +142,7 @@ impl BodyChecker<'_> {
 
         let _ = self.check_block(&function.body, Some(&expect_ty));
 
-        self.current_function = None;
+        self.current_return_ty = None;
     }
 
     // result stands for whether diverge
@@ -179,7 +164,7 @@ impl BodyChecker<'_> {
         }
 
         if let Some(tail) = &block.tail {
-            diverged |= self.check_expr(&tail, expected)?;
+            diverged |= self.check_expr(tail, expected)?;
             self.ctx
                 .record_node_ty(block.id, self.ctx.node_value_ty(tail.id).ok_or(())?.clone());
         } else {
@@ -187,7 +172,7 @@ impl BodyChecker<'_> {
             self.ctx.record_node_ty(block.id, ty);
 
             if let Some(expected_ty) = expected {
-                self.coerce_node(block.id, &expected_ty, block.span.clone())?;
+                self.coerce_node(block.id, expected_ty, block.span.clone())?;
             }
         };
 
@@ -446,7 +431,7 @@ impl BodyChecker<'_> {
                     }
                     Ty::Box(inner) => {
                         // Owned Box access preserves its owner's mutability
-                        let place = operand_place.unwrap_or_else(|| PlaceInfo {
+                        let place = operand_place.unwrap_or(PlaceInfo {
                             writable: true,
                             mutable_access_blocked: false,
                         });
@@ -463,7 +448,6 @@ impl BodyChecker<'_> {
 
                 self.ctx.record_node_ty(id, ty);
                 self.ctx.record_node_place(id, place);
-                self.ctx.record_node_access(id, ResolvedAccess::Deref);
             }
             UnaryOp::Neg | UnaryOp::Not => {
                 let scalar_ty = match expr.op {
@@ -840,13 +824,13 @@ impl BodyChecker<'_> {
             }
         }
 
-        let (elem_ty, kind) = match &base_ty {
-            Ty::Array { elem, .. } => (elem.as_ref().clone(), IndexKind::Array),
+        let elem_ty = match &base_ty {
+            Ty::Array { elem, .. } => elem.as_ref().clone(),
             Ty::Vec(elem) => {
                 // Unlike array projection, Vec indexing borrows the container.
                 // Later dereferences must not bypass an immutable Vec owner.
                 place.mutable_access_blocked |= !place.writable;
-                (elem.as_ref().clone(), IndexKind::Vec)
+                elem.as_ref().clone()
             }
             _ => {
                 self.diagnostics.push(Diagnostic::new(
@@ -866,7 +850,6 @@ impl BodyChecker<'_> {
         );
         self.ctx.record_node_ty(id, elem_ty);
         self.ctx.record_node_place(id, place);
-        self.ctx.record_node_access(id, ResolvedAccess::Index(kind));
 
         if let Some(expected) = expected {
             self.coerce_node(id, expected, span.clone())?;
@@ -1373,13 +1356,6 @@ impl BodyChecker<'_> {
                 field: field_id,
             },
         );
-        self.ctx.record_node_access(
-            id,
-            ResolvedAccess::Field {
-                owner: base_ty_id,
-                field: field_id,
-            },
-        );
 
         if let Some(expected) = expected {
             self.coerce_node(id, expected, span.clone())?;
@@ -1579,32 +1555,27 @@ impl BodyChecker<'_> {
             arm_diverged = false;
         };
 
-        let ty = if expr.else_branch.is_none() {
-            Ty::Unit
-        } else if let Some(expected) = expected {
-            expected.clone()
-        } else {
-            if let Some(ty) = lub_coerce(vec![
-                self.ctx
-                    .node_value_ty(expr.then_branch.id)
-                    .expect("type is resolved"),
-                self.ctx
-                    .node_value_ty(expr.else_branch.as_ref().unwrap().id)
-                    .expect("type is resolved"),
-            ]) {
+        let ty = match (&expr.else_branch, expected) {
+            (None, _) => Ty::Unit,
+            (Some(_), Some(expected)) => expected.clone(),
+            (Some(else_branch), None) => {
+                let Some(ty) = lub_coerce(vec![
+                    self.ctx
+                        .node_value_ty(expr.then_branch.id)
+                        .expect("type is resolved"),
+                    self.ctx
+                        .node_value_ty(else_branch.id)
+                        .expect("type is resolved"),
+                ]) else {
+                    self.diagnostics.push(Diagnostic::new(
+                        "incompatible type for if arms",
+                        span.clone(),
+                    ));
+                    return Err(());
+                };
                 self.coerce_node(expr.then_branch.id, &ty, expr.then_branch.span.clone())?;
-                self.coerce_node(
-                    expr.else_branch.as_ref().unwrap().id,
-                    &ty,
-                    expr.else_branch.as_ref().unwrap().span.clone(),
-                )?;
+                self.coerce_node(else_branch.id, &ty, else_branch.span.clone())?;
                 ty
-            } else {
-                self.diagnostics.push(Diagnostic::new(
-                    "incompatible type for if arms",
-                    span.clone(),
-                ));
-                return Err(());
             }
         };
 
@@ -1626,10 +1597,10 @@ impl BodyChecker<'_> {
         if let Some(value) = value {
             self.check_expr(
                 value,
-                Some(&self.current_function.as_ref().unwrap().return_ty.clone()),
+                Some(&self.current_return_ty.as_ref().unwrap().clone()),
             )?;
         } else {
-            let return_ty = &self.current_function.as_ref().unwrap().return_ty;
+            let return_ty = self.current_return_ty.as_ref().unwrap();
             if plan_coercion(&Ty::Unit, return_ty).is_err() {
                 self.diagnostics
                     .push(Diagnostic::new("incompatible return type", span.clone()));
@@ -1637,10 +1608,6 @@ impl BodyChecker<'_> {
             };
         };
 
-        self.ctx.record_node_jump(
-            id,
-            JumpTarget::Return(self.current_function.as_ref().unwrap().id),
-        );
         self.ctx.record_node_ty(id, Ty::Never);
         if let Some(expected) = expected {
             self.coerce_node(id, expected, span.clone())?;
@@ -1654,7 +1621,7 @@ pub fn body_check(ast: &Crate, ctx: &mut SemanticCtx, diagnostics: &mut Vec<Diag
         ctx,
         diagnostics,
 
-        current_function: None,
+        current_return_ty: None,
         loop_stack: Vec::new(),
     };
 

@@ -1,8 +1,8 @@
 use std::fmt::Write;
 
 use crate::ir::{
-    BasicBlock, BinaryOp, CastOp, Constant, Function, InstId, Instruction, InstructionKind,
-    IntPredicate, IrTy, Module, Operand, StructDef, StructId, Terminator,
+    BasicBlock, BinaryOp, Constant, Function, InstId, Instruction, InstructionKind, IntPredicate,
+    IrTy, Module, Operand, StructDef, StructId, Terminator,
 };
 
 fn format_ty(ty: &IrTy) -> String {
@@ -39,7 +39,6 @@ fn format_operand(operand: Operand) -> String {
             Constant::I1(value) => value.to_string(),
             Constant::I8(value) => value.to_string(),
             Constant::I32(value) => value.to_string(),
-            Constant::Null => "null".into(),
         },
     }
 }
@@ -71,7 +70,6 @@ fn emit_terminal(out: &mut String, terminal: &Terminator, function: &Function) {
         Terminator::Ret(value) => {
             writeln!(out, "  ret {}", format_typed_operand(*value, function),).unwrap()
         }
-        Terminator::Unreachable => writeln!(out, "  unreachable").unwrap(),
     }
 }
 
@@ -167,14 +165,10 @@ fn emit_inst(
             )
             .unwrap();
         }
-        InstructionKind::Cast { op, value, to } => {
-            let opcode = match op {
-                CastOp::ZExt => "zext",
-                CastOp::Trunc => "trunc",
-            };
+        InstructionKind::ZExt { value, to } => {
             write!(
                 out,
-                "{opcode} {} to {}",
+                "zext {} to {}",
                 format_typed_operand(*value, function),
                 format_ty(to)
             )

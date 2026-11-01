@@ -53,13 +53,6 @@ where
             .map(|(index, def)| (I::from(index as u32), def))
     }
 
-    pub fn iter_mut(&mut self) -> impl Iterator<Item = (I, &mut D)> {
-        self.definitions
-            .iter_mut()
-            .enumerate()
-            .map(|(index, def)| (I::from(index as u32), def))
-    }
-
     /// Defines a name, returning its new ID or the existing ID on a duplicate.
     pub fn define(&mut self, name: String, def: D) -> Result<I, I> {
         match self.names.entry(name) {
@@ -228,7 +221,6 @@ pub struct BuiltinDef {
 #[derive(Debug)]
 pub struct StructDef {
     pub name: String,
-    pub ast_node_id: AstNodeId,
     pub span: Span,
     pub fields: Namespace<FieldId, FieldDef>,
     pub associated_values: Namespace<ValueId, ValueDef>,
@@ -255,13 +247,11 @@ impl TypeDef {
 pub struct FieldDef {
     pub name: String,
     pub ast_node_id: AstNodeId,
-    pub span: Span,
     pub ty: Option<Ty>,
 }
 
 #[derive(Debug)]
 pub struct ValueDef {
-    pub name: String,
     /// The function or constant node ID; `None` for builtins.
     pub ast_node_id: Option<AstNodeId>,
     /// The function or constant node span; `None` for builtins.
@@ -408,19 +398,10 @@ impl LocalTable {
 
 #[derive(Debug)]
 pub struct LocalDef {
-    pub name: String,
     pub ast_node_id: AstNodeId,
-    pub span: Span,
     pub is_mut: bool,
-    pub kind: LocalDefKind,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum LocalDefKind {
-    Param,
-    Let,
-    Receiver { ty: TypeId },
-}
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Ty {
     I32,
@@ -487,7 +468,6 @@ pub struct NodeInfo {
 #[derive(Debug, Default)]
 pub struct ExprSemantics {
     pub place: Option<PlaceInfo>,
-    pub access: Option<ResolvedAccess>,
     pub adjustment: Option<UseAdjustment>,
     pub call: Option<ResolvedCall>,
     pub jump: Option<JumpTarget>,
@@ -497,21 +477,6 @@ pub struct ExprSemantics {
 pub struct PlaceInfo {
     pub writable: bool,
     pub mutable_access_blocked: bool,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum ResolvedAccess {
-    Deref,
-
-    Field { owner: TypeId, field: FieldId },
-
-    Index(IndexKind),
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum IndexKind {
-    Array,
-    Vec,
 }
 
 #[derive(Debug, Clone)]
@@ -558,7 +523,6 @@ pub enum BuiltinOp {
 
 #[derive(Debug, Clone, Copy)]
 pub enum JumpTarget {
-    Return(AstNodeId),
     Break(AstNodeId),
     Continue(AstNodeId),
 }
@@ -604,10 +568,6 @@ impl SemanticCtx {
 
     pub fn iter_types(&self) -> impl Iterator<Item = (TypeId, &TypeDef)> {
         self.defs.types.iter()
-    }
-
-    pub fn iter_types_mut(&mut self) -> impl Iterator<Item = (TypeId, &mut TypeDef)> {
-        self.defs.types.iter_mut()
     }
 
     /// Records the definition ID associated with an AST node.
@@ -682,15 +642,6 @@ impl SemanticCtx {
             .expr
             .get_or_insert_with(ExprSemantics::default)
             .place = Some(place);
-    }
-
-    pub fn record_node_access(&mut self, node: AstNodeId, access: ResolvedAccess) {
-        self.node_info
-            .entry(node)
-            .or_default()
-            .expr
-            .get_or_insert_with(ExprSemantics::default)
-            .access = Some(access);
     }
 
     pub fn node_call(&self, node: AstNodeId) -> Option<&ResolvedCall> {
@@ -821,7 +772,6 @@ pub fn semantic_check(ast: &Crate) -> Result<SemanticCtx, Vec<Diagnostic>> {
                 .define(
                     name.to_string(),
                     ValueDef {
-                        name: name.to_string(),
                         ast_node_id: None,
                         span: None,
                         kind: ValueDefKind::BuiltinFunction,
@@ -837,7 +787,6 @@ pub fn semantic_check(ast: &Crate) -> Result<SemanticCtx, Vec<Diagnostic>> {
         ctx.define_value(
             builtin_value.to_string(),
             ValueDef {
-                name: builtin_value.to_string(),
                 ast_node_id: None,
                 span: None,
                 kind: ValueDefKind::BuiltinFunction,

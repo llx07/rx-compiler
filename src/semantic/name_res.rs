@@ -4,7 +4,7 @@ use crate::{
     diagnostic::Diagnostic,
     frontend::ast::{ConstValueKind, Crate, ExprKind, Path, PathIdent, PathSegment, TyAstKind},
     semantic::{
-        DefId, LocalDef, LocalDefKind, LocalId, SemanticCtx, TypeId,
+        DefId, LocalDef, LocalId, SemanticCtx, TypeId,
         visitor::{
             Visitor, walk_block, walk_const_value, walk_expr, walk_function, walk_let_stmt,
             walk_struct, walk_ty,
@@ -59,13 +59,10 @@ impl<'a> Visitor for NameResolution<'a> {
     fn visit_function(&mut self, node: &crate::frontend::ast::Function) {
         self.scopes.push(HashMap::new());
         if let Some(receiver) = &node.receiver {
-            if let Some(target) = self.current_impl_target {
+            if self.current_impl_target.is_some() {
                 let self_id = self.ctx.alloc_local(LocalDef {
-                    name: "self".to_string(),
                     ast_node_id: receiver.id,
-                    span: receiver.span.clone(),
                     is_mut: receiver.is_mut && !receiver.is_ref,
-                    kind: LocalDefKind::Receiver { ty: target },
                 });
 
                 self.ctx.record_node_def(receiver.id, DefId::Local(self_id));
@@ -92,11 +89,8 @@ impl<'a> Visitor for NameResolution<'a> {
             }
 
             let param_id = self.ctx.alloc_local(LocalDef {
-                name: name.clone(),
                 ast_node_id: param.id,
-                span: param.span.clone(),
                 is_mut: param.binding.is_mut,
-                kind: LocalDefKind::Param,
             });
             self.ctx.record_node_def(param.id, DefId::Local(param_id));
 
@@ -119,11 +113,8 @@ impl<'a> Visitor for NameResolution<'a> {
     fn visit_let_stmt(&mut self, node: &crate::frontend::ast::LetStmt) {
         walk_let_stmt(self, node);
         let let_id = self.ctx.alloc_local(LocalDef {
-            name: node.binding.name.name.clone(),
             ast_node_id: node.id,
-            span: node.span.clone(),
             is_mut: node.binding.is_mut,
-            kind: LocalDefKind::Let,
         });
         self.ctx.record_node_def(node.id, DefId::Local(let_id));
 
@@ -257,8 +248,8 @@ impl<'a> NameResolution<'a> {
         path_seg: &PathSegment,
     ) -> Result<Option<DefId>, Diagnostic> {
         let name = match &path_seg.name {
-            PathIdent::Ident(ident) => &ident.name,
-            PathIdent::SelfValue => &"self".to_string(),
+            PathIdent::Ident(ident) => ident.name.as_str(),
+            PathIdent::SelfValue => "self",
             PathIdent::SelfType => {
                 return Err(Diagnostic::new(
                     "Self is not a valid value",
@@ -267,24 +258,17 @@ impl<'a> NameResolution<'a> {
             }
         };
 
-        let first_found = self
+        let local = self
             .scopes
             .iter()
             .rev()
-            .map(|scope| scope.get(name))
-            .find(|id| id.is_some());
-
-        if let Some(found) = first_found {
-            Ok(Some(DefId::Local(*found.expect("found is some"))))
-        } else {
-            // lookup in global namespace
-            let global_result = self.ctx.lookup_value_def(name);
-            if let Some(found) = global_result {
-                Ok(Some(DefId::GlobalValue(found)))
-            } else {
-                Err(Diagnostic::new("name not found", path_seg.span.clone()))
-            }
-        }
+            .find_map(|scope| scope.get(name))
+            .copied()
+            .map(DefId::Local);
+        local
+            .or_else(|| self.ctx.lookup_value_def(name).map(DefId::GlobalValue))
+            .map(Some)
+            .ok_or_else(|| Diagnostic::new("name not found", path_seg.span.clone()))
     }
 
     fn resolve_associated_value(

@@ -67,7 +67,6 @@ pub enum Constant {
     I1(bool),
     I8(u8),
     I32(u32),
-    Null,
 }
 
 impl Constant {
@@ -76,7 +75,6 @@ impl Constant {
             Self::I1(_) => &IrTy::I1,
             Self::I8(_) => &IrTy::I8,
             Self::I32(_) => &IrTy::I32,
-            Self::Null => &IrTy::Ptr,
         }
     }
 }
@@ -148,8 +146,7 @@ pub enum InstructionKind {
         lhs: Operand,
         rhs: Operand,
     },
-    Cast {
-        op: CastOp,
+    ZExt {
         value: Operand,
         to: IrTy,
     },
@@ -196,12 +193,6 @@ pub enum IntPredicate {
     Uge,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CastOp {
-    ZExt,
-    Trunc,
-}
-
 #[derive(Debug)]
 pub enum Terminator {
     Br(BlockId),
@@ -211,5 +202,4 @@ pub enum Terminator {
         else_block: BlockId,
     },
     Ret(Operand),
-    Unreachable,
 }

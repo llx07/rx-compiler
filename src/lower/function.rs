@@ -1,6 +1,6 @@
 use crate::{
     frontend::ast::{self, CallExpr, Expr, UnaryOp},
-    ir::{BinaryOp, CastOp, FunctionId, IntPredicate, IrTy, Operand, Signature, Terminator},
+    ir::{BinaryOp, FunctionId, IntPredicate, IrTy, Operand, Signature, Terminator},
     semantic::{self, Adjustment, DefId, JumpTarget, Ty, TypedConstKind},
 };
 
@@ -405,7 +405,7 @@ impl IrLowerer<'_> {
         let operand = self.lower_expr(&cast.expr)?;
         let value = operand.as_value(self);
         let value = if matches!(operand.ty(), semantic::Ty::Bool) {
-            self.builder.cast(CastOp::ZExt, value, IrTy::I32)
+            self.builder.zext(value, IrTy::I32)
         } else {
             value
         };

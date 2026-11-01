@@ -1,7 +1,7 @@
 use crate::ir::BasicBlock;
 
 use super::{
-    BinaryOp, BlockId, CastOp, Constant, Function, FunctionBody, FunctionId, InstId, Instruction,
+    BinaryOp, BlockId, Constant, Function, FunctionBody, FunctionId, InstId, Instruction,
     InstructionKind, IntPredicate, IrTy, Module, Operand, Signature, StructDef, StructId,
     Terminator,
 };
@@ -85,7 +85,7 @@ impl Builder {
                 Some(ty.clone())
             }
             InstructionKind::ICmp { .. } => Some(IrTy::I1),
-            InstructionKind::Cast { to, .. } => Some(to.clone()),
+            InstructionKind::ZExt { to, .. } => Some(to.clone()),
             InstructionKind::Call { function, .. } => {
                 let ty = &self.module.functions[function.0 as usize].signature.result;
                 (*ty != IrTy::Void).then(|| ty.clone())
@@ -124,10 +124,6 @@ impl Builder {
 
     pub fn position_at_end(&mut self, block: BlockId) {
         self.current_block_id = Some(block);
-    }
-
-    pub fn alloca(&mut self, ty: IrTy) -> Operand {
-        Operand::Instruction(self.append_instruction(InstructionKind::Alloca { ty }))
     }
 
     pub fn alloca_in_entry(&mut self, ty: IrTy) -> Operand {
@@ -189,8 +185,8 @@ impl Builder {
         }))
     }
 
-    pub fn cast(&mut self, op: CastOp, value: Operand, to: IrTy) -> Operand {
-        Operand::Instruction(self.append_instruction(InstructionKind::Cast { op, value, to }))
+    pub fn zext(&mut self, value: Operand, to: IrTy) -> Operand {
+        Operand::Instruction(self.append_instruction(InstructionKind::ZExt { value, to }))
     }
 
     pub fn call(&mut self, function: FunctionId, args: Vec<Operand>) -> Operand {
