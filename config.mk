@@ -7,7 +7,9 @@ BUILD = cargo build --release && \
     $(CLANG) --target=riscv32-unknown-elf -march=rv32im -mabi=ilp32 \
     -O2 -fno-builtin -S runtime/runtime.c -o {runtime}
 
+ifeq ($(shell uname -s),Darwin)
 CLANG = /opt/homebrew/opt/llvm@22/bin/clang
+endif
 
 # Required for semantic tests: exit 0 to accept {source}, 1 to reject it.
 SEMANTIC = ./target/release/rx-compiler --stage=semantic {source}
