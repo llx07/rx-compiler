@@ -142,9 +142,9 @@ impl IrLowerer<'_> {
             ast::ExprKind::Assign(_) => self.lower_assign(expr.id),
             ast::ExprKind::Cast(cast) => self.lower_cast(expr.id, cast),
             ast::ExprKind::Unit => self.lower_unit(),
-            ast::ExprKind::Array(_) => self.lower_array(expr.id),
+            ast::ExprKind::Array(array) => self.lower_array(expr.id, array),
             ast::ExprKind::Index(index) => self.lower_index(expr.id, index),
-            ast::ExprKind::Struct(_) => self.lower_struct_expr(expr.id),
+            ast::ExprKind::Struct(structure) => self.lower_struct_expr(expr.id, structure),
             ast::ExprKind::Call(call_expr) => self.lower_call(expr.id, call_expr),
             ast::ExprKind::MethodCall(_) => self.lower_method_call(expr.id),
             ast::ExprKind::Field(field) => self.lower_field(expr.id, field),
@@ -400,8 +400,79 @@ impl IrLowerer<'_> {
         Ok(LoweredExpr::value(semantic::Ty::Unit, Operand::Void))
     }
 
-    fn lower_array(&mut self, _id: ast::AstNodeId) -> Result<LoweredExpr, ()> {
-        todo!()
+    fn lower_array(
+        &mut self,
+        id: ast::AstNodeId,
+        array: &ast::ArrayExpr,
+    ) -> Result<LoweredExpr, ()> {
+        let ty = self.semantic.node_ty(id).unwrap().clone();
+        let Ty::Array { elem, len } = &ty else {
+            unreachable!("array expression must have an array type")
+        };
+        let ir_ty = self.lower_ty(ty.clone());
+        let align = self.align_of(elem);
+        let ptr = self.builder.alloca_in_entry(ir_ty.clone(), align);
+
+        match array {
+            ast::ArrayExpr::Elements(elements) => {
+                for (index, element) in elements.iter().enumerate() {
+                    let value = self.lower_expr(element)?.as_value(self);
+                    let element_ptr = self.builder.get_element_ptr(
+                        ir_ty.clone(),
+                        ptr,
+                        vec![Operand::const_i32(0), Operand::const_i32(index as u32)],
+                    );
+                    self.builder.store(value, element_ptr, align);
+                }
+            }
+            ast::ArrayExpr::Repeat { value, .. } => {
+                let value = self.lower_expr(value)?.as_value(self);
+                if *len == 1 {
+                    let element_ptr = self.builder.get_element_ptr(
+                        ir_ty,
+                        ptr,
+                        vec![Operand::const_i32(0), Operand::const_i32(0)],
+                    );
+                    self.builder.store(value, element_ptr, align);
+                } else {
+                    let index_ptr = self.builder.alloca_in_entry(IrTy::I32, 4);
+                    self.builder.store(Operand::const_i32(0), index_ptr, 4);
+                    let condition = self.builder.create_block();
+                    let body = self.builder.create_block();
+                    let end = self.builder.create_block();
+                    self.builder.terminate(Terminator::Br(condition));
+
+                    self.builder.position_at_end(condition);
+                    let index = self.builder.load(IrTy::I32, index_ptr, 4);
+                    let in_bounds = self.builder.icmp(
+                        IntPredicate::Ult,
+                        index,
+                        Operand::const_i32(*len as u32),
+                    );
+                    self.builder.terminate(Terminator::CondBr {
+                        condition: in_bounds,
+                        then_block: body,
+                        else_block: end,
+                    });
+
+                    self.builder.position_at_end(body);
+                    let element_ptr = self.builder.get_element_ptr(
+                        ir_ty,
+                        ptr,
+                        vec![Operand::const_i32(0), index],
+                    );
+                    self.builder.store(value, element_ptr, align);
+                    let next = self
+                        .builder
+                        .binary(BinaryOp::Add, index, Operand::const_i32(1));
+                    self.builder.store(next, index_ptr, 4);
+                    self.builder.terminate(Terminator::Br(condition));
+                    self.builder.position_at_end(end);
+                }
+            }
+        }
+
+        Ok(LoweredExpr::place(ty, ptr))
     }
 
     fn lower_index(
@@ -433,8 +504,33 @@ impl IrLowerer<'_> {
         Ok(LoweredExpr::place(ty, ptr))
     }
 
-    fn lower_struct_expr(&mut self, _id: ast::AstNodeId) -> Result<LoweredExpr, ()> {
-        todo!()
+    fn lower_struct_expr(
+        &mut self,
+        id: ast::AstNodeId,
+        structure: &ast::StructExpr,
+    ) -> Result<LoweredExpr, ()> {
+        let ty = self.semantic.node_ty(id).unwrap().clone();
+        let ir_ty = self.lower_ty(ty.clone());
+        let ptr = self
+            .builder
+            .alloca_in_entry(ir_ty.clone(), self.align_of(&ty));
+
+        for initializer in &structure.fields {
+            let DefId::Field { field, .. } = self.semantic.node_def(initializer.id).unwrap() else {
+                unreachable!("struct initializer must resolve to a field")
+            };
+            let value = self.lower_expr(&initializer.value)?;
+            let align = self.align_of(value.ty());
+            let value = value.as_value(self);
+            let field_ptr = self.builder.get_element_ptr(
+                ir_ty.clone(),
+                ptr,
+                vec![Operand::const_i32(0), Operand::const_i32(field.into())],
+            );
+            self.builder.store(value, field_ptr, align);
+        }
+
+        Ok(LoweredExpr::place(ty, ptr))
     }
 
     fn lower_call(&mut self, id: ast::AstNodeId, call_expr: &CallExpr) -> Result<LoweredExpr, ()> {
