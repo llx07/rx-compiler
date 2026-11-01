@@ -7,41 +7,11 @@ use crate::{
 use super::{IrLowerer, expr::LoweredExpr};
 
 impl IrLowerer<'_> {
-    fn encode_equality_ty(&self, ty: &Ty) -> String {
-        let (name, inner) = match ty {
-            Ty::I32 => ("i32".into(), None),
-            Ty::U32 => ("u32".into(), None),
-            Ty::ISize => ("isize".into(), None),
-            Ty::USize => ("usize".into(), None),
-            Ty::Bool => ("bool".into(), None),
-            Ty::Unit => ("unit".into(), None),
-            Ty::Never => ("never".into(), None),
-            Ty::Struct(id) => {
-                let TypeDef::Struct(structure) = self.semantic.get_type_def(*id) else {
-                    unreachable!("struct type must refer to a struct definition")
-                };
-                (structure.name.clone(), None)
-            }
-            Ty::Vec(inner) => ("Vec".into(), Some(inner.as_ref())),
-            Ty::Box(inner) => ("Box".into(), Some(inner.as_ref())),
-            Ty::Ref { is_mut, inner } => (
-                if *is_mut { "refmut" } else { "ref" }.into(),
-                Some(inner.as_ref()),
-            ),
-            Ty::Array { elem, len } => (format!("array{len}"), Some(elem.as_ref())),
-        };
-        let mut encoded = format!("ty_{}{name}", name.len());
-        if let Some(inner) = inner {
-            encoded.push_str(&self.encode_equality_ty(inner));
-        }
-        encoded
-    }
-
     fn get_or_declare_equality(&mut self, ty: &Ty) -> FunctionId {
         if let Some(id) = self.equality_fns.get(ty) {
             return *id;
         }
-        let name = format!("__rx_builtin_{}_eq", self.encode_equality_ty(ty));
+        let name = format!("__rx_builtin_{}_eq", self.mangle_ty(ty));
         let id = self.builder.declare_function(
             name,
             Signature {

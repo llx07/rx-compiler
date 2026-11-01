@@ -1,25 +1,20 @@
 use crate::{
     frontend::ast::{self, CallExpr, Expr, UnaryOp},
     ir::{BinaryOp, CastOp, FunctionId, IntPredicate, IrTy, Operand, Signature, Terminator},
-    semantic::{self, Adjustment, DefId, JumpTarget, Ty, TypeDef, TypedConstKind},
+    semantic::{self, Adjustment, DefId, JumpTarget, Ty, TypedConstKind},
 };
 
 use super::{IrLowerer, LoopInfo, expr::LoweredExpr};
 
-/// Encodes a source type name for use in associated-value symbols.
-fn mangle_ty(name: &str) -> String {
-    format!("__rx_ty_{}{name}", name.len())
-}
-
-/// Encodes a source value name, optionally qualified by its owning type.
-fn mangle_value(name: &str, owner: Option<&str>) -> String {
-    match owner {
-        Some(owner) => format!("{}_val_{}{name}", mangle_ty(owner), name.len()),
-        None => format!("__rx_val_{}{name}", name.len()),
-    }
-}
-
 impl IrLowerer<'_> {
+    /// Encodes a source value name, optionally qualified by its owning type.
+    fn mangle_value(&self, name: &str, owner: Option<&Ty>) -> String {
+        match owner {
+            Some(owner) => format!("__rx_{}_val_{}{name}", self.mangle_ty(owner), name.len()),
+            None => format!("__rx_val_{}{name}", name.len()),
+        }
+    }
+
     pub(super) fn declare_function(&mut self, function: &ast::Function) {
         let def = self
             .semantic
@@ -33,12 +28,7 @@ impl IrLowerer<'_> {
             .expect("function signature must be resolved");
         let owner = match def {
             DefId::GlobalValue(_) => None,
-            DefId::AssociatedValue { owner, .. } => {
-                let TypeDef::Struct(structure) = self.semantic.get_type_def(owner) else {
-                    unreachable!("source associated function must belong to a struct")
-                };
-                Some(structure.name.as_str())
-            }
+            DefId::AssociatedValue { owner, .. } => Some(Ty::Struct(owner)),
             _ => unreachable!("function must be a global or associated value"),
         };
         let signature = Signature {
@@ -50,9 +40,8 @@ impl IrLowerer<'_> {
                 .collect(),
             result: self.lower_ty(sig.result.clone()),
         };
-        let id = self
-            .builder
-            .declare_function(mangle_value(&function.name.name, owner), signature);
+        let name = self.mangle_value(&function.name.name, owner.as_ref());
+        let id = self.builder.declare_function(name, signature);
         self.functions.insert(def, id);
         if owner.is_none() && function.name.name == "main" {
             self.main_func = Some(id);

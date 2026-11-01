@@ -6,6 +6,36 @@ use crate::{
 use super::IrLowerer;
 
 impl IrLowerer<'_> {
+    pub(super) fn mangle_ty(&self, ty: &Ty) -> String {
+        let (name, inner) = match ty {
+            Ty::I32 => ("i32".into(), None),
+            Ty::U32 => ("u32".into(), None),
+            Ty::ISize => ("isize".into(), None),
+            Ty::USize => ("usize".into(), None),
+            Ty::Bool => ("bool".into(), None),
+            Ty::Unit => ("unit".into(), None),
+            Ty::Never => ("never".into(), None),
+            Ty::Struct(id) => {
+                let TypeDef::Struct(structure) = self.semantic.get_type_def(*id) else {
+                    unreachable!("struct type must refer to a struct definition")
+                };
+                (structure.name.clone(), None)
+            }
+            Ty::Vec(inner) => ("Vec".into(), Some(inner.as_ref())),
+            Ty::Box(inner) => ("Box".into(), Some(inner.as_ref())),
+            Ty::Ref { is_mut, inner } => (
+                if *is_mut { "refmut" } else { "ref" }.into(),
+                Some(inner.as_ref()),
+            ),
+            Ty::Array { elem, len } => (format!("array{len}"), Some(elem.as_ref())),
+        };
+        let mut encoded = format!("ty_{}{name}", name.len());
+        if let Some(inner) = inner {
+            encoded.push_str(&self.mangle_ty(inner));
+        }
+        encoded
+    }
+
     /// Returns the storage size in bytes for RV32, including aggregate padding.
     pub(super) fn size_of(&self, ty: &Ty) -> u32 {
         match ty {
