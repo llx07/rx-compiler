@@ -1,4 +1,5 @@
 mod box_ty;
+mod clone;
 mod equality;
 mod expr;
 mod function;

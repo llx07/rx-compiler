@@ -623,6 +623,13 @@ impl IrLowerer<'_> {
                     &call_expr.args[1],
                 );
             }
+            semantic::CallTarget::Builtin {
+                op: semantic::BuiltinOp::Clone,
+                ..
+            } => {
+                let value = self.lower_expr(&call_expr.args[0])?.deref(self);
+                return Ok(self.lower_clone(value));
+            }
             semantic::CallTarget::Builtin { .. } => todo!(),
             semantic::CallTarget::User(def) => self.functions[def],
         };
@@ -676,6 +683,13 @@ impl IrLowerer<'_> {
                     &call.receiver,
                     &call.args[0],
                 );
+            }
+            semantic::CallTarget::Builtin {
+                op: semantic::BuiltinOp::Clone,
+                ..
+            } => {
+                let value = self.lower_expr(&call.receiver)?.deref(self);
+                return Ok(self.lower_clone(value));
             }
             semantic::CallTarget::Builtin { .. } => todo!(),
         };
