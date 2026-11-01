@@ -18,9 +18,7 @@ SEMANTIC = ./target/release/rx-compiler --stage=semantic {source}
 IR = ./target/release/rx-compiler --stage=ir {source} -o {output}
 
 # Required for codegen/optimization tests: write RV32IM assembly to {output} (.s).
-CODEGEN = ./target/release/rx-compiler --stage=ir {source} -o {output}.ll && \
-    $(CLANG) -S -x ir --target=riscv32-unknown-elf -march=rv32im -mabi=ilp32 \
-    -O2 -mllvm -riscv-no-aliases {output}.ll -o {output}
+CODEGEN = 
 
 # Required alongside IR/CODEGEN: run the assembly with the BUILD runtime in REIMU.
 RUN = xmake run -P vendor/REIMU reimu --memory=256M --stack=1M \
