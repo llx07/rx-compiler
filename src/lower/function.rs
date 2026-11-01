@@ -1,7 +1,11 @@
 use crate::{
     frontend::ast::{self, CallExpr, Expr, UnaryOp},
     ir::{BinaryOp, CastOp, FunctionId, IntPredicate, IrTy, Operand, Signature, Terminator},
-    semantic::{self, Adjustment, DefId, JumpTarget, Ty, TypedConstKind},
+    semantic::{
+        self, Adjustment,
+        BuiltinOp::{PrintI32, PrintlnI32},
+        DefId, JumpTarget, Ty, TypedConstKind,
+    },
 };
 
 use super::{IrLowerer, LoopInfo, expr::LoweredExpr};
@@ -546,6 +550,17 @@ impl IrLowerer<'_> {
         Ok(result)
     }
 
+    fn lower_array_len(&mut self, receiver: &ast::Expr) -> Result<LoweredExpr, ()> {
+        let value = self.lower_expr(receiver)?.deref_all(self);
+        let Ty::Array { len, .. } = value.ty() else {
+            unreachable!("array len requires an array receiver")
+        };
+        Ok(LoweredExpr::value(
+            Ty::USize,
+            Operand::const_i32(*len as u32),
+        ))
+    }
+
     fn lower_call(&mut self, id: ast::AstNodeId, call_expr: &CallExpr) -> Result<LoweredExpr, ()> {
         let target = self.semantic.node_call(id).unwrap();
         let function_id = match &target.target {
@@ -584,6 +599,10 @@ impl IrLowerer<'_> {
                 return self.lower_vec_new(type_arg.as_ref().expect("Vec has a type argument"));
             }
             semantic::CallTarget::Builtin {
+                op: semantic::BuiltinOp::ArrayLen,
+                ..
+            } => return self.lower_array_len(&call_expr.args[0]),
+            semantic::CallTarget::Builtin {
                 op: semantic::BuiltinOp::VecLen,
                 ..
             } => return self.lower_vec_len(&call_expr.args[0]),
@@ -618,7 +637,6 @@ impl IrLowerer<'_> {
                 let value = self.lower_expr(&call_expr.args[0])?.deref(self);
                 return Ok(self.lower_clone(value));
             }
-            semantic::CallTarget::Builtin { .. } => todo!(),
             semantic::CallTarget::User(def) => self.functions[def],
         };
 
@@ -644,6 +662,10 @@ impl IrLowerer<'_> {
         let target = self.semantic.node_call(id).unwrap();
         let function_id = match &target.target {
             semantic::CallTarget::User(def) => self.functions[def],
+            semantic::CallTarget::Builtin {
+                op: semantic::BuiltinOp::ArrayLen,
+                ..
+            } => return self.lower_array_len(&call.receiver),
             semantic::CallTarget::Builtin {
                 op: semantic::BuiltinOp::VecLen,
                 ..
@@ -679,7 +701,15 @@ impl IrLowerer<'_> {
                 let value = self.lower_expr(&call.receiver)?.deref(self);
                 return Ok(self.lower_clone(value));
             }
-            semantic::CallTarget::Builtin { .. } => todo!(),
+            semantic::CallTarget::Builtin {
+                op:
+                    semantic::BuiltinOp::GetI32
+                    | PrintI32
+                    | PrintlnI32
+                    | semantic::BuiltinOp::BoxNew
+                    | semantic::BuiltinOp::VecNew,
+                ..
+            } => unreachable!("not associated method"),
         };
 
         let args = std::iter::once(call.receiver.as_ref())
