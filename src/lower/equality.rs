@@ -150,6 +150,7 @@ impl IrLowerer<'_> {
                                 let len = self.builder.load(IrTy::I32, len_ptr, align);
                                 (data, len)
                             });
+                        // comparing their length before
                         let equal = self.builder.icmp(IntPredicate::Eq, len, rhs_len);
                         let next = self.builder.create_block();
                         self.builder.terminate(Terminator::CondBr {
@@ -168,7 +169,6 @@ impl IrLowerer<'_> {
 
                 let condition = self.builder.create_block();
                 let body = self.builder.create_block();
-                let next = self.builder.create_block();
 
                 self.builder.terminate(Terminator::Br(condition));
 
@@ -192,18 +192,15 @@ impl IrLowerer<'_> {
                 let equal = self
                     .lower_equality(ast::BinaryOp::Eq, lhs, rhs)
                     .as_value(self);
-                self.builder.terminate(Terminator::CondBr {
-                    condition: equal,
-                    then_block: next,
-                    else_block: failed,
-                });
-
-                self.builder.position_at_end(next);
                 let index =
                     self.builder
                         .binary(crate::ir::BinaryOp::Add, index, Operand::const_i32(1));
                 self.builder.store(index, index_ptr, align);
-                self.builder.terminate(Terminator::Br(condition));
+                self.builder.terminate(Terminator::CondBr {
+                    condition: equal,
+                    then_block: condition,
+                    else_block: failed,
+                });
             }
             Ty::Struct(type_id) => {
                 let TypeDef::Struct(structure) = self.semantic.get_type_def(*type_id) else {
