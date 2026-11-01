@@ -580,7 +580,16 @@ impl IrLowerer<'_> {
                     .expect("I/O builtin must be collected");
                 self.functions[&DefId::GlobalValue(value)]
             }
-            semantic::CallTarget::Builtin { op, type_arg } => todo!(),
+            semantic::CallTarget::Builtin {
+                op: semantic::BuiltinOp::BoxNew,
+                type_arg,
+            } => {
+                return self.lower_box_new(
+                    type_arg.as_ref().expect("Box has a type argument"),
+                    &call_expr.args[0],
+                );
+            }
+            semantic::CallTarget::Builtin { .. } => todo!(),
             semantic::CallTarget::User(def) => self.functions[def],
         };
 
