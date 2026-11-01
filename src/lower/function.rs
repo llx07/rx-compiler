@@ -1,11 +1,7 @@
 use crate::{
     frontend::ast::{self, CallExpr, Expr, UnaryOp},
     ir::{BinaryOp, CastOp, FunctionId, IntPredicate, IrTy, Operand, Signature, Terminator},
-    semantic::{
-        self, Adjustment,
-        BuiltinOp::{PrintI32, PrintlnI32},
-        DefId, JumpTarget, Ty, TypedConstKind,
-    },
+    semantic::{self, Adjustment, DefId, JumpTarget, Ty, TypedConstKind},
 };
 
 use super::{IrLowerer, LoopInfo, expr::LoweredExpr};
@@ -562,19 +558,18 @@ impl IrLowerer<'_> {
     }
 
     fn lower_call(&mut self, id: ast::AstNodeId, call_expr: &CallExpr) -> Result<LoweredExpr, ()> {
+        use semantic::{BuiltinOp as Op, CallTarget::*};
+
         let target = self.semantic.node_call(id).unwrap();
         let function_id = match &target.target {
-            semantic::CallTarget::Builtin {
-                op:
-                    op @ (semantic::BuiltinOp::GetI32
-                    | semantic::BuiltinOp::PrintI32
-                    | semantic::BuiltinOp::PrintlnI32),
+            Builtin {
+                op: op @ (Op::GetI32 | Op::PrintI32 | Op::PrintlnI32),
                 ..
             } => {
                 let name = match op {
-                    semantic::BuiltinOp::GetI32 => "get_i32",
-                    semantic::BuiltinOp::PrintI32 => "print_i32",
-                    semantic::BuiltinOp::PrintlnI32 => "println_i32",
+                    Op::GetI32 => "get_i32",
+                    Op::PrintI32 => "print_i32",
+                    Op::PrintlnI32 => "println_i32",
                     _ => unreachable!(),
                 };
                 let value = self
@@ -583,8 +578,8 @@ impl IrLowerer<'_> {
                     .expect("I/O builtin must be collected");
                 self.functions[&DefId::GlobalValue(value)]
             }
-            semantic::CallTarget::Builtin {
-                op: semantic::BuiltinOp::BoxNew,
+            Builtin {
+                op: Op::BoxNew,
                 type_arg,
             } => {
                 return self.lower_box_new(
@@ -592,26 +587,23 @@ impl IrLowerer<'_> {
                     &call_expr.args[0],
                 );
             }
-            semantic::CallTarget::Builtin {
-                op: semantic::BuiltinOp::VecNew,
+            Builtin {
+                op: Op::VecNew,
                 type_arg,
             } => {
                 return self.lower_vec_new(type_arg.as_ref().expect("Vec has a type argument"));
             }
-            semantic::CallTarget::Builtin {
-                op: semantic::BuiltinOp::ArrayLen,
-                ..
+            Builtin {
+                op: Op::ArrayLen, ..
             } => return self.lower_array_len(&call_expr.args[0]),
-            semantic::CallTarget::Builtin {
-                op: semantic::BuiltinOp::VecLen,
-                ..
-            } => return self.lower_vec_len(&call_expr.args[0]),
-            semantic::CallTarget::Builtin {
-                op: semantic::BuiltinOp::VecIsEmpty,
-                ..
+            Builtin { op: Op::VecLen, .. } => {
+                return self.lower_vec_len(&call_expr.args[0]);
+            }
+            Builtin {
+                op: Op::VecIsEmpty, ..
             } => return self.lower_vec_is_empty(&call_expr.args[0]),
-            semantic::CallTarget::Builtin {
-                op: semantic::BuiltinOp::VecPush,
+            Builtin {
+                op: Op::VecPush,
                 type_arg,
             } => {
                 return self.lower_vec_push(
@@ -620,8 +612,8 @@ impl IrLowerer<'_> {
                     &call_expr.args[1],
                 );
             }
-            semantic::CallTarget::Builtin {
-                op: semantic::BuiltinOp::VecRemove,
+            Builtin {
+                op: Op::VecRemove,
                 type_arg,
             } => {
                 return self.lower_vec_remove(
@@ -630,14 +622,11 @@ impl IrLowerer<'_> {
                     &call_expr.args[1],
                 );
             }
-            semantic::CallTarget::Builtin {
-                op: semantic::BuiltinOp::Clone,
-                ..
-            } => {
+            Builtin { op: Op::Clone, .. } => {
                 let value = self.lower_expr(&call_expr.args[0])?.deref(self);
                 return Ok(self.lower_clone(value));
             }
-            semantic::CallTarget::User(def) => self.functions[def],
+            User(def) => self.functions[def],
         };
 
         let args = call_expr
@@ -659,23 +648,22 @@ impl IrLowerer<'_> {
         id: ast::AstNodeId,
         call: &ast::MethodCallExpr,
     ) -> Result<LoweredExpr, ()> {
+        use semantic::{BuiltinOp as Op, CallTarget::*};
+
         let target = self.semantic.node_call(id).unwrap();
         let function_id = match &target.target {
-            semantic::CallTarget::User(def) => self.functions[def],
-            semantic::CallTarget::Builtin {
-                op: semantic::BuiltinOp::ArrayLen,
-                ..
+            User(def) => self.functions[def],
+            Builtin {
+                op: Op::ArrayLen, ..
             } => return self.lower_array_len(&call.receiver),
-            semantic::CallTarget::Builtin {
-                op: semantic::BuiltinOp::VecLen,
-                ..
-            } => return self.lower_vec_len(&call.receiver),
-            semantic::CallTarget::Builtin {
-                op: semantic::BuiltinOp::VecIsEmpty,
-                ..
+            Builtin { op: Op::VecLen, .. } => {
+                return self.lower_vec_len(&call.receiver);
+            }
+            Builtin {
+                op: Op::VecIsEmpty, ..
             } => return self.lower_vec_is_empty(&call.receiver),
-            semantic::CallTarget::Builtin {
-                op: semantic::BuiltinOp::VecPush,
+            Builtin {
+                op: Op::VecPush,
                 type_arg,
             } => {
                 return self.lower_vec_push(
@@ -684,8 +672,8 @@ impl IrLowerer<'_> {
                     &call.args[0],
                 );
             }
-            semantic::CallTarget::Builtin {
-                op: semantic::BuiltinOp::VecRemove,
+            Builtin {
+                op: Op::VecRemove,
                 type_arg,
             } => {
                 return self.lower_vec_remove(
@@ -694,20 +682,12 @@ impl IrLowerer<'_> {
                     &call.args[0],
                 );
             }
-            semantic::CallTarget::Builtin {
-                op: semantic::BuiltinOp::Clone,
-                ..
-            } => {
+            Builtin { op: Op::Clone, .. } => {
                 let value = self.lower_expr(&call.receiver)?.deref(self);
                 return Ok(self.lower_clone(value));
             }
-            semantic::CallTarget::Builtin {
-                op:
-                    semantic::BuiltinOp::GetI32
-                    | PrintI32
-                    | PrintlnI32
-                    | semantic::BuiltinOp::BoxNew
-                    | semantic::BuiltinOp::VecNew,
+            Builtin {
+                op: Op::GetI32 | Op::PrintI32 | Op::PrintlnI32 | Op::BoxNew | Op::VecNew,
                 ..
             } => unreachable!("not associated method"),
         };
