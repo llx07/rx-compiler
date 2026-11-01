@@ -146,7 +146,7 @@ impl IrLowerer<'_> {
             ast::ExprKind::Index(index) => self.lower_index(expr.id, index),
             ast::ExprKind::Struct(structure) => self.lower_struct_expr(expr.id, structure),
             ast::ExprKind::Call(call_expr) => self.lower_call(expr.id, call_expr),
-            ast::ExprKind::MethodCall(_) => self.lower_method_call(expr.id),
+            ast::ExprKind::MethodCall(call) => self.lower_method_call(expr.id, call),
             ast::ExprKind::Field(field) => self.lower_field(expr.id, field),
             ast::ExprKind::Loop(_) => self.lower_loop(expr.id),
             ast::ExprKind::Break(_) => self.lower_break(expr.id),
@@ -610,8 +610,27 @@ impl IrLowerer<'_> {
         ))
     }
 
-    fn lower_method_call(&mut self, _id: ast::AstNodeId) -> Result<LoweredExpr, ()> {
-        todo!()
+    fn lower_method_call(
+        &mut self,
+        id: ast::AstNodeId,
+        call: &ast::MethodCallExpr,
+    ) -> Result<LoweredExpr, ()> {
+        let target = self.semantic.node_call(id).unwrap();
+        let function_id = match &target.target {
+            semantic::CallTarget::User(def) => self.functions[def],
+            semantic::CallTarget::Builtin { .. } => todo!(),
+        };
+
+        let args = std::iter::once(call.receiver.as_ref())
+            .chain(&call.args)
+            .map(|expr| self.lower_expr(expr).map(|value| value.as_value(self)))
+            .collect::<Result<Vec<_>, _>>()?;
+        let return_value = self.builder.call(function_id, args);
+
+        Ok(LoweredExpr::value(
+            self.semantic.node_ty(id).unwrap().clone(),
+            return_value,
+        ))
     }
 
     fn lower_field(
