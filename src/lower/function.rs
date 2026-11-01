@@ -1,9 +1,7 @@
 use crate::{
     frontend::ast::{self, CallExpr, Expr, UnaryOp},
-    ir::{
-        BinaryOp, CastOp, FunctionId, IntPredicate, IrTy, Operand, Signature, Terminator,
-    },
-    semantic::{self, Adjustment, DefId, TypeDef, TypedConstKind},
+    ir::{BinaryOp, CastOp, FunctionId, IntPredicate, IrTy, Operand, Signature, Terminator},
+    semantic::{self, Adjustment, DefId, Ty, TypeDef, TypedConstKind},
 };
 
 use super::{IrLowerer, expr::LoweredExpr};
@@ -258,7 +256,7 @@ impl IrLowerer<'_> {
         use ast::BinaryOp as Op;
 
         match binary.op {
-            Op::And | Op::Or => return self.lower_short_circuit(id, binary),
+            Op::And | Op::Or => return self.lower_short_circuit(binary),
             Op::Eq | Op::Ne => return self.lower_equality_expr(binary),
             _ => {}
         }
@@ -343,12 +341,41 @@ impl IrLowerer<'_> {
         self.builder.binary(op, lhs, rhs)
     }
 
-    fn lower_short_circuit(
-        &mut self,
-        _id: ast::AstNodeId,
-        _binary: &ast::BinaryExpr,
-    ) -> Result<LoweredExpr, ()> {
-        todo!()
+    fn lower_short_circuit(&mut self, binary: &ast::BinaryExpr) -> Result<LoweredExpr, ()> {
+        let align = self.align_of(&Ty::Bool);
+
+        let lhs = self.lower_expr(&binary.lhs)?;
+        let result = self.builder.alloca_in_entry(self.lower_ty(Ty::Bool), align);
+        let lhs_value = lhs.as_value(self);
+        self.builder.store(lhs_value, result, align);
+
+        let cond = match binary.op {
+            ast::BinaryOp::And => self.builder.not(lhs_value),
+            ast::BinaryOp::Or => lhs_value,
+            _ => unreachable!("only short circuit operator"),
+        };
+
+        let rhs_block = self.builder.create_block();
+        let merge_block = self.builder.create_block();
+
+        self.builder.terminate(Terminator::CondBr {
+            condition: cond,
+            then_block: merge_block,
+            else_block: rhs_block,
+        });
+
+        self.builder.position_at_end(rhs_block);
+        if let Ok(rhs) = self.lower_expr(&binary.rhs) {
+            let rhs_value = rhs.as_value(self);
+            self.builder.store(rhs_value, result, align);
+            self.builder.terminate(Terminator::Br(merge_block));
+        }
+
+        self.builder.position_at_end(merge_block);
+        Ok(LoweredExpr::value(
+            Ty::Bool,
+            self.builder.load(IrTy::I1, result, align),
+        ))
     }
 
     fn lower_assign(&mut self, _id: ast::AstNodeId) -> Result<LoweredExpr, ()> {
