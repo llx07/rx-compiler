@@ -143,11 +143,11 @@ impl IrLowerer<'_> {
             ast::ExprKind::Cast(cast) => self.lower_cast(expr.id, cast),
             ast::ExprKind::Unit => self.lower_unit(),
             ast::ExprKind::Array(_) => self.lower_array(expr.id),
-            ast::ExprKind::Index(_) => self.lower_index(expr.id),
+            ast::ExprKind::Index(index) => self.lower_index(expr.id, index),
             ast::ExprKind::Struct(_) => self.lower_struct_expr(expr.id),
             ast::ExprKind::Call(call_expr) => self.lower_call(expr.id, call_expr),
             ast::ExprKind::MethodCall(_) => self.lower_method_call(expr.id),
-            ast::ExprKind::Field(_) => self.lower_field(expr.id),
+            ast::ExprKind::Field(field) => self.lower_field(expr.id, field),
             ast::ExprKind::Loop(_) => self.lower_loop(expr.id),
             ast::ExprKind::Break(_) => self.lower_break(expr.id),
             ast::ExprKind::Continue => self.lower_continue(expr.id),
@@ -404,8 +404,33 @@ impl IrLowerer<'_> {
         todo!()
     }
 
-    fn lower_index(&mut self, _id: ast::AstNodeId) -> Result<LoweredExpr, ()> {
-        todo!()
+    fn lower_index(
+        &mut self,
+        id: ast::AstNodeId,
+        expr: &ast::IndexExpr,
+    ) -> Result<LoweredExpr, ()> {
+        let base = self.lower_expr(&expr.base)?;
+        let index = self.lower_expr(&expr.index)?.as_value(self);
+
+        let ty = self.semantic.node_ty(id).unwrap().clone();
+        let ir_ty = self.lower_ty(ty.clone());
+        let base = match base.ty() {
+            Ty::Array { .. } => base.as_place(self),
+            Ty::Vec(_) => {
+                let vec_ty = self.lower_ty(base.ty().clone());
+                let align = self.align_of(base.ty());
+                let base = base.as_place(self);
+                let data_ptr = self.builder.get_element_ptr(
+                    vec_ty,
+                    base,
+                    vec![Operand::const_i32(0), Operand::const_i32(0)],
+                );
+                self.builder.load(IrTy::Ptr, data_ptr, align)
+            }
+            _ => unreachable!("base of index must resolve to an array or Vec"),
+        };
+        let ptr = self.builder.get_element_ptr(ir_ty, base, vec![index]);
+        Ok(LoweredExpr::place(ty, ptr))
     }
 
     fn lower_struct_expr(&mut self, _id: ast::AstNodeId) -> Result<LoweredExpr, ()> {
@@ -456,8 +481,26 @@ impl IrLowerer<'_> {
         todo!()
     }
 
-    fn lower_field(&mut self, _id: ast::AstNodeId) -> Result<LoweredExpr, ()> {
-        todo!()
+    fn lower_field(
+        &mut self,
+        id: ast::AstNodeId,
+        field: &ast::FieldExpr,
+    ) -> Result<LoweredExpr, ()> {
+        let base = self.lower_expr(&field.base)?;
+        let DefId::Field { owner, field } = self.semantic.node_def(id).unwrap() else {
+            unreachable!("field access must resolve to a field")
+        };
+        let ir_ty = self.lower_ty(Ty::Struct(owner));
+        let base = base.as_place(self);
+        let ptr = self.builder.get_element_ptr(
+            ir_ty,
+            base,
+            vec![Operand::const_i32(0), Operand::const_i32(field.into())],
+        );
+        Ok(LoweredExpr::place(
+            self.semantic.node_ty(id).unwrap().clone(),
+            ptr,
+        ))
     }
 
     fn lower_loop(&mut self, _id: ast::AstNodeId) -> Result<LoweredExpr, ()> {
