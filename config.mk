@@ -1,11 +1,9 @@
 # Fill in these five commands. See README-EN.md or README-ZH.md for details.
-CLANG ?= clang-22
+
 # Optional: build your compiler once before testing. Leave empty if prebuilt.
 # {runtime} will be linked into every program.
-# Write shared runtime assembly there if your IR/CODEGEN output references it.
-BUILD = cargo build --release && \
-    $(CLANG) --target=riscv32-unknown-elf -march=rv32im -mabi=ilp32 \
-    -O2 -fno-builtin -S runtime/runtime.c -o {runtime}
+# Precompile runtime/runtime.c locally to runtime/runtime.s before testing.
+BUILD = cargo build --release && cp runtime/runtime.s {runtime}
 
 ifeq ($(shell uname -s),Darwin)
 CLANG = /opt/homebrew/opt/llvm@22/bin/clang
