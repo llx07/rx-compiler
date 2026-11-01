@@ -32,6 +32,8 @@ struct IrLowerer<'a> {
     functions: HashMap<DefId, FunctionId>,
     equality_fns: HashMap<Ty, FunctionId>,
     pending_equality: Vec<(Ty, FunctionId)>,
+    clone_fns: HashMap<Ty, FunctionId>,
+    pending_clone: Vec<(Ty, FunctionId)>,
     vec_struct: Option<StructId>,
     main_func: Option<FunctionId>,
     runtime_functions: HashMap<RuntimeFunction, FunctionId>,
@@ -75,6 +77,7 @@ impl IrLowerer<'_> {
         }
 
         self.define_equalities();
+        self.define_clones();
         self.wrap_main();
 
         self.builder.finish()
@@ -91,6 +94,8 @@ pub fn lower(krate: &ast::Crate, semantic: &SemanticCtx) -> ir::Module {
         functions: HashMap::new(),
         equality_fns: HashMap::new(),
         pending_equality: Vec::new(),
+        clone_fns: HashMap::new(),
+        pending_clone: Vec::new(),
         vec_struct: None,
         main_func: None,
         runtime_functions: HashMap::new(),
