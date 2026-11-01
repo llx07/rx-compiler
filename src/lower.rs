@@ -8,14 +8,21 @@ use std::collections::HashMap;
 
 use crate::{
     frontend::ast,
-    ir::{self, FunctionId, StructId, builder::Builder},
+    ir::{self, BlockId, FunctionId, Operand, StructId, builder::Builder},
     semantic::{DefId, LocalId, SemanticCtx, Ty, TypeId},
 };
+
+struct LoopInfo {
+    entry: BlockId,
+    exit: Option<BlockId>,
+    result: Option<Operand>,
+}
 
 struct IrLowerer<'a> {
     semantic: &'a SemanticCtx,
     builder: Builder,
     locals: HashMap<LocalId, expr::LoweredExpr>,
+    loop_info: HashMap<ast::AstNodeId, LoopInfo>,
     structs: HashMap<TypeId, StructId>,
     functions: HashMap<DefId, FunctionId>,
     equality_fns: HashMap<Ty, FunctionId>,
@@ -74,6 +81,7 @@ pub fn lower(krate: &ast::Crate, semantic: &SemanticCtx) -> ir::Module {
         semantic,
         builder: Builder::new(),
         locals: HashMap::new(),
+        loop_info: HashMap::new(),
         structs: HashMap::new(),
         functions: HashMap::new(),
         equality_fns: HashMap::new(),

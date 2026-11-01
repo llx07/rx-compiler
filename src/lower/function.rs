@@ -1,10 +1,10 @@
 use crate::{
     frontend::ast::{self, CallExpr, Expr, UnaryOp},
     ir::{BinaryOp, CastOp, FunctionId, IntPredicate, IrTy, Operand, Signature, Terminator},
-    semantic::{self, Adjustment, DefId, Ty, TypeDef, TypedConstKind},
+    semantic::{self, Adjustment, DefId, JumpTarget, Ty, TypeDef, TypedConstKind},
 };
 
-use super::{IrLowerer, expr::LoweredExpr};
+use super::{IrLowerer, LoopInfo, expr::LoweredExpr};
 
 /// Encodes a source type name for use in associated-value symbols.
 fn mangle_ty(name: &str) -> String {
@@ -148,8 +148,8 @@ impl IrLowerer<'_> {
             ast::ExprKind::Call(call_expr) => self.lower_call(expr.id, call_expr),
             ast::ExprKind::MethodCall(call) => self.lower_method_call(expr.id, call),
             ast::ExprKind::Field(field) => self.lower_field(expr.id, field),
-            ast::ExprKind::Loop(_) => self.lower_loop(expr.id),
-            ast::ExprKind::Break(_) => self.lower_break(expr.id),
+            ast::ExprKind::Loop(loop_expr) => self.lower_loop(expr.id, loop_expr),
+            ast::ExprKind::Break(value) => self.lower_break(expr.id, value.as_deref()),
             ast::ExprKind::Continue => self.lower_continue(expr.id),
             ast::ExprKind::If(if_expr) => self.lower_if(expr.id, if_expr),
             ast::ExprKind::Return(return_value) => self.lower_return(return_value.as_deref()),
@@ -655,16 +655,89 @@ impl IrLowerer<'_> {
         ))
     }
 
-    fn lower_loop(&mut self, _id: ast::AstNodeId) -> Result<LoweredExpr, ()> {
-        todo!()
+    fn lower_loop(&mut self, id: ast::AstNodeId, expr: &ast::LoopExpr) -> Result<LoweredExpr, ()> {
+        let (entry_block, exit, body) = match expr {
+            ast::LoopExpr::Loop { body } => {
+                let entry_block = self.builder.create_block();
+                self.builder.terminate(Terminator::Br(entry_block));
+                self.builder.position_at_end(entry_block);
+                (entry_block, None, body)
+            }
+            ast::LoopExpr::While { condition, body } => {
+                let entry_block = self.builder.create_block();
+                self.builder.terminate(Terminator::Br(entry_block));
+
+                self.builder.position_at_end(entry_block);
+                let condition = self.lower_expr(condition)?.as_value(self);
+
+                let body_block = self.builder.create_block();
+                let exit = self.builder.create_block();
+                
+                self.builder.terminate(Terminator::CondBr {
+                    condition,
+                    then_block: body_block,
+                    else_block: exit,
+                });
+                self.builder.position_at_end(body_block);
+                (entry_block, Some(exit), body)
+            }
+        };
+        self.loop_info.insert(
+            id,
+            LoopInfo {
+                entry: entry_block,
+                exit,
+                result: None,
+            },
+        );
+
+        if self.lower_block(body).is_ok() {
+            self.builder.terminate(Terminator::Br(entry_block));
+        }
+        let info = self.loop_info.remove(&id).unwrap();
+
+        self.builder.position_at_end(info.exit.ok_or(())?);
+        let ty = self.semantic.node_ty(id).unwrap().clone();
+        Ok(match info.result {
+            Some(ptr) => LoweredExpr::place(ty, ptr),
+            None => LoweredExpr::value(ty, Operand::Void),
+        })
     }
 
-    fn lower_break(&mut self, _id: ast::AstNodeId) -> Result<LoweredExpr, ()> {
-        todo!()
+    fn lower_break(&mut self, id: ast::AstNodeId, value: Option<&Expr>) -> Result<LoweredExpr, ()> {
+        let value = match value {
+            Some(expr) => self.lower_expr(expr)?.as_value(self),
+            None => Operand::Void,
+        };
+
+        let JumpTarget::Break(target) = self.semantic.node_jump(id).unwrap() else {
+            unreachable!("break must target a loop")
+        };
+        let ty = self.semantic.node_ty(target).unwrap().clone();
+        let align = self.align_of(&ty);
+
+        let info = self.loop_info.get_mut(&target).unwrap();
+        let exit = *info.exit.get_or_insert_with(|| self.builder.create_block());
+
+        if ty != Ty::Unit {
+            let ir_ty = self.lower_ty(ty);
+            let info = self.loop_info.get_mut(&target).unwrap();
+            let ptr = *info
+                .result
+                .get_or_insert_with(|| self.builder.alloca_in_entry(ir_ty, align));
+            self.builder.store(value, ptr, align);
+        }
+        self.builder.terminate(Terminator::Br(exit));
+        Err(())
     }
 
-    fn lower_continue(&mut self, _id: ast::AstNodeId) -> Result<LoweredExpr, ()> {
-        todo!()
+    fn lower_continue(&mut self, id: ast::AstNodeId) -> Result<LoweredExpr, ()> {
+        let JumpTarget::Continue(target) = self.semantic.node_jump(id).unwrap() else {
+            unreachable!("continue must target a loop")
+        };
+        self.builder
+            .terminate(Terminator::Br(self.loop_info[&target].entry));
+        Err(())
     }
 
     fn lower_if(&mut self, id: ast::AstNodeId, expr: &ast::IfExpr) -> Result<LoweredExpr, ()> {
