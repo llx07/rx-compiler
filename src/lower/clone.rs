@@ -77,16 +77,33 @@ impl IrLowerer<'_> {
 
                 self.builder.load(ir_ty, cloned_ptr)
             }
-            Ty::Array { .. } => todo!(),
-            Ty::Vec(inner_ty) => {
+            Ty::Array { .. } | Ty::Vec(_) => {
                 let ir_ty = self.lower_ty(ty.clone());
                 let cloned_ptr = self.builder.alloca_in_entry(ir_ty.clone());
-                let elem_size = self.size_of(inner_ty);
-                let len = original.field(1, Ty::USize, self).as_value(self);
-                self.builder.call(
-                    self.runtime_functions[&RuntimeFunction::VecNewWithSize],
-                    vec![cloned_ptr, len, Operand::const_i32(elem_size)],
-                );
+                let (source_data, target_data, len, elem_ty) = match ty {
+                    Ty::Array { elem, len } => (
+                        original.as_place(self),
+                        cloned_ptr,
+                        Operand::const_i32(*len as u32),
+                        elem.as_ref(),
+                    ),
+                    Ty::Vec(elem) => {
+                        let len = original.field(1, Ty::USize, self).as_value(self);
+                        self.builder.call(
+                            self.runtime_functions[&RuntimeFunction::VecNewWithSize],
+                            vec![cloned_ptr, len, Operand::const_i32(self.size_of(elem))],
+                        );
+                        let data_ty = Ty::Ref {
+                            is_mut: false,
+                            inner: elem.clone(),
+                        };
+                        let source_data = original.field(0, data_ty.clone(), self).as_value(self);
+                        let target = LoweredExpr::place(ty.clone(), cloned_ptr);
+                        let target_data = target.field(0, data_ty, self).as_value(self);
+                        (source_data, target_data, len, elem.as_ref())
+                    }
+                    _ => unreachable!(),
+                };
 
                 let index_ptr = self.builder.alloca_in_entry(IrTy::I32);
                 self.builder.store(Operand::const_i32(0), index_ptr);
@@ -106,21 +123,14 @@ impl IrLowerer<'_> {
                 });
 
                 self.builder.position_at_end(clone_block);
-                let data_ty = Ty::Ref {
-                    is_mut: false,
-                    inner: inner_ty.clone(),
-                };
-                let source_data = original.field(0, data_ty.clone(), self).as_value(self);
-                let target = LoweredExpr::place(ty.clone(), cloned_ptr);
-                let target_data = target.field(0, data_ty, self).as_value(self);
-                let elem_ir_ty = self.lower_ty(inner_ty.as_ref().clone());
+                let elem_ir_ty = self.lower_ty(elem_ty.clone());
                 let source_ptr =
                     self.builder
                         .get_element_ptr(elem_ir_ty.clone(), source_data, vec![index]);
                 let target_ptr = self
                     .builder
                     .get_element_ptr(elem_ir_ty, target_data, vec![index]);
-                let source = LoweredExpr::place(inner_ty.as_ref().clone(), source_ptr);
+                let source = LoweredExpr::place(elem_ty.clone(), source_ptr);
                 let cloned = self.lower_clone(source).as_value(self);
                 self.builder.store(cloned, target_ptr);
                 let next_index =
