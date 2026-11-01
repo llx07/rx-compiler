@@ -139,7 +139,7 @@ impl IrLowerer<'_> {
             ast::ExprKind::Block(block) => self.lower_block(block),
             ast::ExprKind::Unary(unary) => self.lower_unary(expr.id, unary),
             ast::ExprKind::Binary(binary) => self.lower_binary(expr.id, binary),
-            ast::ExprKind::Assign(_) => self.lower_assign(expr.id),
+            ast::ExprKind::Assign(assign) => self.lower_assign(assign),
             ast::ExprKind::Cast(cast) => self.lower_cast(expr.id, cast),
             ast::ExprKind::Unit => self.lower_unit(),
             ast::ExprKind::Array(array) => self.lower_array(expr.id, array),
@@ -378,8 +378,45 @@ impl IrLowerer<'_> {
         ))
     }
 
-    fn lower_assign(&mut self, _id: ast::AstNodeId) -> Result<LoweredExpr, ()> {
-        todo!()
+    fn lower_assign(&mut self, assign: &ast::AssignExpr) -> Result<LoweredExpr, ()> {
+        use ast::AssignOp as Op;
+
+        let rhs = self.lower_expr(&assign.rhs)?;
+        let rhs = LoweredExpr::value(rhs.ty().clone(), rhs.as_value(self));
+        let lhs = self.lower_expr(&assign.lhs)?;
+        let place = lhs.as_place(self);
+        let align = self.align_of(lhs.ty());
+
+        let result = match assign.op {
+            Op::Assign => rhs.as_value(self),
+            _ => {
+                let op = match assign.op {
+                    Op::AddAssign => ast::BinaryOp::Add,
+                    Op::SubAssign => ast::BinaryOp::Sub,
+                    Op::MulAssign => ast::BinaryOp::Mul,
+                    Op::DivAssign => ast::BinaryOp::Div,
+                    Op::RemAssign => ast::BinaryOp::Rem,
+                    Op::BitAndAssign => ast::BinaryOp::BitAnd,
+                    Op::BitOrAssign => ast::BinaryOp::BitOr,
+                    Op::BitXorAssign => ast::BinaryOp::BitXor,
+                    Op::ShlAssign => ast::BinaryOp::Shl,
+                    Op::ShrAssign => ast::BinaryOp::Shr,
+                    Op::Assign => unreachable!(),
+                };
+                let signed = matches!(lhs.ty(), Ty::I32 | Ty::ISize);
+                let lhs = lhs.as_value(self);
+                let rhs = if matches!(rhs.ty(), Ty::Ref { .. }) {
+                    rhs.deref(self)
+                } else {
+                    rhs
+                };
+                let rhs = rhs.as_value(self);
+                self.lower_binary_arithmetic(op, lhs, rhs, signed)
+            }
+        };
+
+        self.builder.store(result, place, align);
+        self.lower_unit()
     }
 
     fn lower_cast(&mut self, id: ast::AstNodeId, cast: &ast::CastExpr) -> Result<LoweredExpr, ()> {
