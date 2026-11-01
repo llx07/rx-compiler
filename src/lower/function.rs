@@ -151,7 +151,7 @@ impl IrLowerer<'_> {
             ast::ExprKind::Loop(_) => self.lower_loop(expr.id),
             ast::ExprKind::Break(_) => self.lower_break(expr.id),
             ast::ExprKind::Continue => self.lower_continue(expr.id),
-            ast::ExprKind::If(_) => self.lower_if(expr.id),
+            ast::ExprKind::If(if_expr) => self.lower_if(expr.id, if_expr),
             ast::ExprKind::Return(return_value) => self.lower_return(return_value.as_deref()),
         }?;
         if let Some(adjustment) = self.semantic.node_adjustment(expr.id) {
@@ -667,8 +667,62 @@ impl IrLowerer<'_> {
         todo!()
     }
 
-    fn lower_if(&mut self, _id: ast::AstNodeId) -> Result<LoweredExpr, ()> {
-        todo!()
+    fn lower_if(&mut self, id: ast::AstNodeId, expr: &ast::IfExpr) -> Result<LoweredExpr, ()> {
+        let condition = self.lower_expr(&expr.condition)?.as_value(self);
+
+        let ty = self.semantic.node_ty(id).unwrap().clone();
+        let align = self.align_of(&ty);
+
+        let then_block = self.builder.create_block();
+        let else_block = expr
+            .else_branch
+            .as_ref()
+            .map(|_| self.builder.create_block());
+
+        let mut merge_block = None;
+
+        let false_target = match else_block {
+            Some(block) => block,
+            None => {
+                let block = self.builder.create_block();
+                merge_block = Some(block);
+                block
+            }
+        };
+        let mut result = None;
+
+        self.builder.terminate(Terminator::CondBr {
+            condition,
+            then_block,
+            else_block: false_target,
+        });
+
+        let mut lower_branch = |block, branch: &Expr| {
+            self.builder.position_at_end(block);
+            if let Ok(value) = self.lower_expr(branch) {
+                let merge = *merge_block.get_or_insert_with(|| self.builder.create_block());
+                if ty != Ty::Unit {
+                    let ptr = *result.get_or_insert_with(|| {
+                        self.builder
+                            .alloca_in_entry(self.lower_ty(ty.clone()), align)
+                    });
+                    let value = value.as_value(self);
+                    self.builder.store(value, ptr, align);
+                }
+                self.builder.terminate(Terminator::Br(merge));
+            }
+        };
+
+        lower_branch(then_block, &expr.then_branch);
+        if let Some(branch) = &expr.else_branch {
+            lower_branch(else_block.unwrap(), branch);
+        }
+
+        self.builder.position_at_end(merge_block.ok_or(())?);
+        Ok(match result {
+            Some(ptr) => LoweredExpr::place(ty, ptr),
+            None => LoweredExpr::value(ty, Operand::Void),
+        })
     }
 
     fn lower_return(&mut self, return_value: Option<&Expr>) -> Result<LoweredExpr, ()> {
